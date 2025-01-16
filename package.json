@@ -1,0 +1,174 @@
+{
+    "name": "code-snippets-manager",
+    "displayName": "Code Snippets Manager",
+    "description": "Manage your code snippets with folders and GitHub Gist sync",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.85.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "activationEvents": [
+        "onView:snippetsExplorer"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "snippets-explorer",
+                    "title": "Snippets Explorer",
+                    "icon": "resources/snippets.svg"
+                }
+            ]
+        },
+        "views": {
+            "snippets-explorer": [
+                {
+                    "id": "snippetsExplorer",
+                    "name": "Snippets"
+                }
+            ]
+        },
+        "menus": {
+            "view/title": [
+                {
+                    "command": "snippets.addFolder",
+                    "when": "view == snippetsExplorer",
+                    "group": "navigation"
+                },
+                {
+                    "command": "snippets.syncToGist",
+                    "when": "view == snippetsExplorer",
+                    "group": "navigation"
+                },
+                {
+                    "command": "snippets.exportSnippets",
+                    "when": "view == snippetsExplorer",
+                    "group": "navigation"
+                },
+                {
+                    "command": "snippets.manageGitHubToken",
+                    "when": "view == snippetsExplorer",
+                    "group": "navigation@1"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "snippets.addSnippet",
+                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "group": "inline"
+                },
+                {
+                    "command": "snippets.deleteItem",
+                    "when": "view == snippetsExplorer",
+                    "group": "inline"
+                },
+                {
+                    "command": "snippets.renameFolder",
+                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "group": "1_modification"
+                },
+                {
+                    "command": "snippets.renameSnippet",
+                    "when": "view == snippetsExplorer && viewItem == snippet",
+                    "group": "1_modification"
+                },
+                {
+                    "command": "snippets.deleteItem",
+                    "when": "view == snippetsExplorer",
+                    "group": "9_cutcopypaste"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "snippets.addFolder",
+                "title": "Add Folder",
+                "icon": "$(add)"
+            },
+            {
+                "command": "snippets.addSnippet",
+                "title": "Add Snippet",
+                "icon": "$(add)"
+            },
+            {
+                "command": "snippets.deleteItem",
+                "title": "Delete",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "snippets.openSnippet",
+                "title": "Open Snippet"
+            },
+            {
+                "command": "snippets.configureSync",
+                "title": "Configure GitHub Sync"
+            },
+            {
+                "command": "snippets.syncToGist",
+                "title": "Sync to GitHub Gist",
+                "icon": "$(sync)"
+            },
+            {
+                "command": "snippets.syncFromGist",
+                "title": "Sync from GitHub Gist"
+            },
+            {
+                "command": "snippets.renameFolder",
+                "title": "Rename Folder"
+            },
+            {
+                "command": "snippets.renameSnippet",
+                "title": "Rename Snippet"
+            },
+            {
+                "command": "snippets.exportSnippets",
+                "title": "Export Snippets",
+                "icon": "$(export)"
+            },
+            {
+                "command": "snippets.resetGithubConfig",
+                "title": "Reset GitHub Configuration",
+                "category": "Snippets"
+            },
+            {
+                "command": "snippets.manageGitHubToken",
+                "title": "Manage GitHub Token",
+                "icon": "$(account)"
+            }
+        ],
+        "configuration": {
+            "title": "Code Snippets Manager",
+            "properties": {
+                "snippets.githubToken": {
+                    "type": "string",
+                    "description": "GitHub Personal Access Token for Gist synchronization",
+                    "scope": "application"
+                },
+                "snippets.gistMapping": {
+                    "type": "object",
+                    "description": "Mapping of snippet IDs to their corresponding Gist IDs",
+                    "scope": "application",
+                    "default": {}
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./"
+    },
+    "devDependencies": {
+        "@types/node": "^16.18.123",
+        "@types/vscode": "^1.96.0",
+        "typescript": "^5.7.3"
+    },
+    "dependencies": {
+        "@types/axios": "^0.9.36",
+        "axios": "^1.7.9",
+        "monaco-editor": "^0.52.2"
+    }
+}
