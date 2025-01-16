@@ -287,6 +287,21 @@ export function activate(context: vscode.ExtensionContext) {
                     }
                     break;
             }
+        }),
+
+        vscode.commands.registerCommand('snippets.search', async () => {
+            const query = await vscode.window.showInputBox({
+                placeHolder: 'Search snippets by name or tag...',
+                prompt: 'Enter text to search snippets'
+            });
+            
+            if (query !== undefined) { // User didn't cancel
+                treeDataProvider.setSearchQuery(query);
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.clearSearch', () => {
+            treeDataProvider.setSearchQuery('');
         })
     );
 

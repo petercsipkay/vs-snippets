@@ -34,24 +34,34 @@
         "menus": {
             "view/title": [
                 {
+                    "command": "snippets.search",
+                    "when": "view == snippetsExplorer",
+                    "group": "navigation@0"
+                },
+                {
+                    "command": "snippets.clearSearch",
+                    "when": "view == snippetsExplorer",
+                    "group": "navigation@1"
+                },
+                {
                     "command": "snippets.addFolder",
                     "when": "view == snippetsExplorer",
-                    "group": "navigation"
+                    "group": "navigation@2"
                 },
                 {
                     "command": "snippets.syncToGist",
                     "when": "view == snippetsExplorer",
-                    "group": "navigation"
+                    "group": "navigation@3"
                 },
                 {
                     "command": "snippets.exportSnippets",
                     "when": "view == snippetsExplorer",
-                    "group": "navigation"
+                    "group": "navigation@4"
                 },
                 {
                     "command": "snippets.manageGitHubToken",
                     "when": "view == snippetsExplorer",
-                    "group": "navigation@1"
+                    "group": "navigation@5"
                 }
             ],
             "view/item/context": [
@@ -83,6 +93,16 @@
             ]
         },
         "commands": [
+            {
+                "command": "snippets.search",
+                "title": "Search Snippets",
+                "icon": "$(search)"
+            },
+            {
+                "command": "snippets.clearSearch",
+                "title": "Clear Search",
+                "icon": "$(clear-all)"
+            },
             {
                 "command": "snippets.addFolder",
                 "title": "Add Folder",

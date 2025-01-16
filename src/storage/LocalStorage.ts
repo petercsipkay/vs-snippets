@@ -42,6 +42,10 @@ export class LocalStorage {
         return snippets.filter(s => s.folderId === folderId);
     }
 
+    async getAllSnippets(): Promise<Snippet[]> {
+        return this.getSnippetsData();
+    }
+
     async addFolder(name: string): Promise<void> {
         const folders = await this.getFoldersData();
         folders.push({
