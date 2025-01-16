@@ -5,6 +5,7 @@ import { GistStorage } from './storage/GistStorage';
 import { SnippetEditor } from './editor/SnippetEditor';
 import * as fs from 'fs';
 import * as path from 'path';
+import { SnippetTreeItem } from './sidebar/SnippetTreeItem';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Activating extension');  // Debug log
@@ -76,20 +77,12 @@ export function activate(context: vscode.ExtensionContext) {
             treeDataProvider.refresh();
         }),
 
-        vscode.commands.registerCommand('snippets.openSnippet', async (item) => {
-            console.log('Opening snippet:', item);  // Debug log
-            try {
-                const snippet = await localStorage.getSnippet(item.id);
-                console.log('Retrieved snippet:', snippet);  // Debug log
-                if (snippet) {
-                    await SnippetEditor.show(snippet, localStorage, context.extensionUri);
-                } else {
-                    console.error('Snippet not found:', item.id);  // Debug log
-                    vscode.window.showErrorMessage('Snippet not found');
-                }
-            } catch (error) {
-                console.error('Error opening snippet:', error);  // Debug log
-                vscode.window.showErrorMessage('Error opening snippet');
+        vscode.commands.registerCommand('snippets.openSnippet', async (item: SnippetTreeItem) => {
+            const snippet = await localStorage.getSnippet(item.id);
+            if (snippet) {
+                await SnippetEditor.show(snippet);
+            } else {
+                vscode.window.showErrorMessage('Snippet not found');
             }
         }),
 
@@ -302,6 +295,17 @@ export function activate(context: vscode.ExtensionContext) {
 
         vscode.commands.registerCommand('snippets.clearSearch', () => {
             treeDataProvider.setSearchQuery('');
+        }),
+
+        vscode.commands.registerCommand('snippets.updateSnippet', async (update: {
+            id: string;
+            code?: string;
+            notes?: string;
+            language?: string;
+            tags?: string[];
+        }) => {
+            await localStorage.updateSnippet(update);
+            treeDataProvider.refresh();
         })
     );
 

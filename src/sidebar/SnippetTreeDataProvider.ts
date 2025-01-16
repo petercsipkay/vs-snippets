@@ -63,8 +63,14 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
                         `${snippet.name} (${folderName})`,
                         snippet.id,
                         vscode.TreeItemCollapsibleState.None,
-                        'snippet'
+                        'snippet',
+                        snippet.language
                     );
+                    item.command = {
+                        command: 'snippets.openSnippet',
+                        title: 'Open Snippet',
+                        arguments: [item]
+                    };
                     items.push(item);
                 }
                 
@@ -82,12 +88,21 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
         } else if (element.type === 'folder') {
             // Folder level - show snippets
             const snippets = await this.localStorage.getSnippets(element.id);
-            return snippets.map(snippet => new SnippetTreeItem(
-                snippet.name,
-                snippet.id,
-                vscode.TreeItemCollapsibleState.None,
-                'snippet'
-            ));
+            return snippets.map(snippet => {
+                const item = new SnippetTreeItem(
+                    snippet.name,
+                    snippet.id,
+                    vscode.TreeItemCollapsibleState.None,
+                    'snippet',
+                    snippet.language
+                );
+                item.command = {
+                    command: 'snippets.openSnippet',
+                    title: 'Open Snippet',
+                    arguments: [item]
+                };
+                return item;
+            });
         }
         return [];
     }
