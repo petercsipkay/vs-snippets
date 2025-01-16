@@ -3,6 +3,7 @@ import { SnippetTreeDataProvider } from './sidebar/SnippetTreeDataProvider';
 import { LocalStorage } from './storage/LocalStorage';
 import { GistStorage } from './storage/GistStorage';
 import { SnippetEditor } from './editor/SnippetEditor';
+import { BackupManager } from './backup/BackupManager';
 import * as fs from 'fs';
 import * as path from 'path';
 import { SnippetTreeItem } from './sidebar/SnippetTreeItem';
@@ -305,7 +306,16 @@ export function activate(context: vscode.ExtensionContext) {
             tags?: string[];
         }) => {
             await localStorage.updateSnippet(update);
+            // Get the full snippet to backup
+            const snippet = await localStorage.getSnippet(update.id);
+            if (snippet) {
+                await BackupManager.backupSnippet(snippet);
+            }
             treeDataProvider.refresh();
+        }),
+
+        vscode.commands.registerCommand('snippets.configureBackupFolder', async () => {
+            await BackupManager.configureBackupFolder();
         })
     );
 
