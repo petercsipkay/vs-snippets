@@ -10,6 +10,22 @@ export class SnippetTreeItem extends vscode.TreeItem {
     ) {
         super(label, collapsibleState);
 
+        // Set the contextValue to match the type for menu contributions
+        this.contextValue = type;
+
+        // Set tooltip
+        this.tooltip = type === 'folder' ? `Folder: ${label}` : label;
+
+        // For snippets, set up the open command
+        if (type === 'snippet') {
+            this.command = {
+                command: 'snippets.openSnippet',
+                title: 'Open Snippet',
+                arguments: [this]
+            };
+        }
+
+        // Set icon based on type
         if (type === 'folder') {
             this.iconPath = new vscode.ThemeIcon('folder');
         } else {
@@ -43,11 +59,10 @@ export class SnippetTreeItem extends vscode.TreeItem {
 
                 const extension = extensionMap[language.toLowerCase()] || '.txt';
                 this.resourceUri = vscode.Uri.parse(`file:///dummy/file${extension}`);
+                this.tooltip = `${label} (${language})`;
             } else {
                 this.iconPath = new vscode.ThemeIcon('symbol-snippet');
             }
         }
-
-        this.contextValue = type;
     }
 } 

@@ -27,114 +27,116 @@ interface SnippetUpdate {
 
 export class LocalStorage {
     private storageDir: string | null = null;
+    private initialized: boolean = false;
 
     constructor(private storage: vscode.Memento) {
-        this.initializeStorage();
+        // Initialize storage asynchronously and track completion
+        this.initializeStorage().then(() => {
+            this.initialized = true;
+            console.log('Storage initialization complete');
+        }).catch(err => {
+            console.error('Failed to initialize storage:', err);
+        });
+    }
+
+    private async waitForInitialization() {
+        if (!this.initialized) {
+            console.log('Waiting for storage initialization...');
+            await new Promise<void>((resolve) => {
+                const check = () => {
+                    if (this.initialized) {
+                        resolve();
+                    } else {
+                        setTimeout(check, 100);
+                    }
+                };
+                check();
+            });
+            console.log('Storage initialization complete');
+        }
     }
 
     private async initializeStorage() {
         try {
+            console.log('Initializing storage...');
             // Try to get configured storage location
             const config = vscode.workspace.getConfiguration('snippets');
             let configuredPath = await config.get<string>('storageLocation');
 
             if (!configuredPath) {
-                // Use the existing CodeSnippets directory
-                const defaultPath = path.join(os.homedir(), 'Library', 'Application Support', 'CodeSnippets');
-                
-                try {
-                    console.log(`Using default storage directory: ${defaultPath}`);
-                    // Try to access the directory first
+                // Try different locations in order of preference
+                const possibleLocations = [
+                    path.join(os.homedir(), 'Documents', 'CodeSnippets'),
+                    path.join(os.homedir(), '.vscode', 'snippets'),
+                    path.join(os.homedir(), '.snippets'),
+                    path.join(process.env.HOME || os.homedir(), '.config', 'code-snippets'),
+                    path.join(os.homedir(), 'Library', 'Application Support', 'CodeSnippets')
+                ];
+
+                for (const location of possibleLocations) {
                     try {
-                        await fs.promises.access(defaultPath, fs.constants.W_OK);
-                        console.log('Directory exists and is writable');
+                        console.log(`Trying storage location: ${location}`);
+                        await fs.promises.mkdir(location, { recursive: true, mode: 0o755 });
+                        await fs.promises.access(location, fs.constants.W_OK);
+                        configuredPath = location;
+                        await config.update('storageLocation', location, true);
+                        console.log(`Successfully configured storage at: ${location}`);
+                        break;
                     } catch (err) {
-                        // If directory doesn't exist or isn't writable, try to create it
-                        console.log('Creating directory with proper permissions');
-                        await fs.promises.mkdir(defaultPath, { recursive: true, mode: 0o755 });
-                        await fs.promises.access(defaultPath, fs.constants.W_OK);
+                        console.log(`Failed to use location ${location}:`, err);
+                        continue;
                     }
-                    
-                    configuredPath = defaultPath;
-                    await config.update('storageLocation', defaultPath, true);
-                    console.log('Successfully configured storage directory');
-                } catch (err: any) {
-                    console.error('Failed to use default directory:', err);
-                    // If we can't use the default directory, ask user to select a location
-                    const result = await vscode.window.showErrorMessage(
-                        'Cannot access the default storage directory. Would you like to select a custom location?',
-                        { modal: true },
-                        'Select Location'
-                    );
+                }
 
-                    if (result === 'Select Location') {
-                        const uri = await vscode.window.showOpenDialog({
-                            canSelectFiles: false,
-                            canSelectFolders: true,
-                            canSelectMany: false,
-                            openLabel: 'Select Storage Location',
-                            title: 'Select Snippets Storage Location',
-                            defaultUri: vscode.Uri.file(path.join(os.homedir(), 'Documents'))
-                        });
-
-                        if (uri && uri[0]) {
-                            const selectedPath = uri[0].fsPath;
-                            await fs.promises.mkdir(selectedPath, { recursive: true, mode: 0o755 });
-                            await fs.promises.access(selectedPath, fs.constants.W_OK);
-                            configuredPath = selectedPath;
-                            await config.update('storageLocation', selectedPath, true);
-                            console.log(`Using user-selected directory: ${selectedPath}`);
-                        }
-                    }
+                if (!configuredPath) {
+                    console.error('Could not find a writable storage location');
+                    this.storageDir = null;
+                    return;
                 }
             }
 
-            if (configuredPath) {
-                try {
-                    await fs.promises.access(configuredPath, fs.constants.W_OK);
-                    this.storageDir = configuredPath;
-                    console.log('Using storage directory:', this.storageDir);
-                } catch (err: any) {
-                    console.error('Failed to access storage directory:', err);
-                    const result = await vscode.window.showErrorMessage(
-                        `Failed to access storage directory: ${err.message}. Would you like to select a different location?`,
-                        { modal: true },
-                        'Select New Location'
-                    );
+            // Verify the configured path is accessible
+            try {
+                console.log(`Verifying storage location: ${configuredPath}`);
+                await fs.promises.mkdir(configuredPath, { recursive: true, mode: 0o755 });
+                await fs.promises.access(configuredPath, fs.constants.W_OK);
+                this.storageDir = configuredPath;
+                console.log('Storage directory verified and accessible');
 
-                    if (result === 'Select New Location') {
-                        await config.update('storageLocation', undefined, true);
-                        await this.initializeStorage();
-                    }
-                }
-            } else {
-                const result = await vscode.window.showErrorMessage(
-                    'No valid storage location configured. Would you like to select a location?',
-                    { modal: true },
-                    'Select Location'
-                );
+                // Initialize empty files if they don't exist
+                const foldersPath = path.join(this.storageDir, 'folders.json');
+                const snippetsPath = path.join(this.storageDir, 'snippets.json');
 
-                if (result === 'Select Location') {
-                    await config.update('storageLocation', undefined, true);
-                    await this.initializeStorage();
+                if (!fs.existsSync(foldersPath)) {
+                    await fs.promises.writeFile(foldersPath, '[]', { mode: 0o600 });
                 }
+                if (!fs.existsSync(snippetsPath)) {
+                    await fs.promises.writeFile(snippetsPath, '[]', { mode: 0o600 });
+                }
+            } catch (err) {
+                console.error('Failed to access configured storage location:', err);
+                this.storageDir = null;
             }
-        } catch (err: any) {
+        } catch (err) {
             console.error('Error initializing storage:', err);
-            vscode.window.showErrorMessage(`Failed to initialize storage: ${err.message}`);
+            this.storageDir = null;
         }
+    }
+
+    private async ensureStorageInitialized(): Promise<boolean> {
+        if (!this.storageDir) {
+            await this.initializeStorage();
+        }
+        return !!this.storageDir;
     }
 
     private async getFoldersData(): Promise<Folder[]> {
         try {
-            if (!this.storageDir) {
-                await this.initializeStorage();
-                if (!this.storageDir) {
-                    return this.storage.get('folders', []);
-                }
+            if (!await this.ensureStorageInitialized()) {
+                return this.storage.get('folders', []);
             }
 
-            const foldersPath = path.join(this.storageDir, 'folders.json');
+            const foldersPath = path.join(this.storageDir!, 'folders.json');
             try {
                 const data = await fs.promises.readFile(foldersPath, 'utf8');
                 return JSON.parse(data);
@@ -150,14 +152,11 @@ export class LocalStorage {
 
     private async getSnippetsData(): Promise<Snippet[]> {
         try {
-            if (!this.storageDir) {
-                await this.initializeStorage();
-                if (!this.storageDir) {
-                    return this.storage.get('snippets', []);
-                }
+            if (!await this.ensureStorageInitialized()) {
+                return this.storage.get('snippets', []);
             }
 
-            const snippetsPath = path.join(this.storageDir, 'snippets.json');
+            const snippetsPath = path.join(this.storageDir!, 'snippets.json');
             try {
                 const data = await fs.promises.readFile(snippetsPath, 'utf8');
                 return JSON.parse(data);
@@ -173,28 +172,14 @@ export class LocalStorage {
 
     private async saveFoldersData(folders: Folder[]): Promise<void> {
         try {
-            if (!this.storageDir) {
-                await this.initializeStorage();
-                if (!this.storageDir) {
-                    await this.storage.update('folders', folders);
-                    return;
-                }
-            }
-
-            // Ensure the directory exists with proper permissions
-            try {
-                await fs.promises.mkdir(this.storageDir, { recursive: true, mode: 0o700 });
-                await fs.promises.access(this.storageDir, fs.constants.W_OK);
-            } catch (err: any) {
-                console.error('Failed to ensure storage directory exists:', err);
-                // If we can't create/access the directory, fall back to memento storage
+            if (!await this.ensureStorageInitialized()) {
                 await this.storage.update('folders', folders);
                 return;
             }
 
-            const foldersPath = path.join(this.storageDir, 'folders.json');
+            const foldersPath = path.join(this.storageDir!, 'folders.json');
             await fs.promises.writeFile(foldersPath, JSON.stringify(folders, null, 2), { mode: 0o600 });
-        } catch (err: any) {
+        } catch (err) {
             console.error('Failed to save folders:', err);
             // Fallback to memento storage
             await this.storage.update('folders', folders);
@@ -203,28 +188,14 @@ export class LocalStorage {
 
     private async saveSnippetsData(snippets: Snippet[]): Promise<void> {
         try {
-            if (!this.storageDir) {
-                await this.initializeStorage();
-                if (!this.storageDir) {
-                    await this.storage.update('snippets', snippets);
-                    return;
-                }
-            }
-
-            // Ensure the directory exists with proper permissions
-            try {
-                await fs.promises.mkdir(this.storageDir, { recursive: true, mode: 0o700 });
-                await fs.promises.access(this.storageDir, fs.constants.W_OK);
-            } catch (err: any) {
-                console.error('Failed to ensure storage directory exists:', err);
-                // If we can't create/access the directory, fall back to memento storage
+            if (!await this.ensureStorageInitialized()) {
                 await this.storage.update('snippets', snippets);
                 return;
             }
 
-            const snippetsPath = path.join(this.storageDir, 'snippets.json');
+            const snippetsPath = path.join(this.storageDir!, 'snippets.json');
             await fs.promises.writeFile(snippetsPath, JSON.stringify(snippets, null, 2), { mode: 0o600 });
-        } catch (err: any) {
+        } catch (err) {
             console.error('Failed to save snippets:', err);
             // Fallback to memento storage
             await this.storage.update('snippets', snippets);
@@ -276,9 +247,19 @@ export class LocalStorage {
     }
 
     async deleteSnippet(snippetId: string): Promise<void> {
-        const snippets = await this.getSnippetsData();
-        const updatedSnippets = snippets.filter(s => s.id !== snippetId);
-        await this.saveSnippetsData(updatedSnippets);
+        try {
+            await this.waitForInitialization();
+            console.log('Deleting snippet with ID:', snippetId);
+            const snippets = await this.getSnippetsData();
+            console.log('Current snippets count:', snippets.length);
+            const updatedSnippets = snippets.filter(s => s.id !== snippetId);
+            console.log('Updated snippets count:', updatedSnippets.length);
+            await this.saveSnippetsData(updatedSnippets);
+            console.log('Snippet deleted successfully');
+        } catch (error) {
+            console.error('Error deleting snippet:', error);
+            throw error;
+        }
     }
 
     async updateSnippet(update: SnippetUpdate): Promise<void> {
@@ -386,6 +367,135 @@ export class LocalStorage {
         if (snippetIndex !== -1) {
             snippets[snippetIndex].name = newName;
             await this.saveSnippetsData(snippets);
+        }
+    }
+
+    async exportData(): Promise<string> {
+        try {
+            const data = await this.getAllData();
+            const exportData = {
+                version: "1.0",
+                timestamp: new Date().toISOString(),
+                data: {
+                    folders: data.folders.map(folder => ({
+                        id: folder.id,
+                        name: folder.name
+                    })),
+                    snippets: data.snippets.map(snippet => ({
+                        id: snippet.id,
+                        name: snippet.name,
+                        code: snippet.code,
+                        notes: snippet.notes || "",
+                        folderId: snippet.folderId,
+                        language: snippet.language || "plaintext"
+                    }))
+                }
+            };
+            
+            return JSON.stringify(exportData, null, 2);
+        } catch (error: any) {
+            console.error('Error exporting data:', error);
+            throw new Error(`Failed to export data: ${error.message}`);
+        }
+    }
+
+    async importData(jsonData: string): Promise<void> {
+        try {
+            const importedData = JSON.parse(jsonData);
+            
+            // Validate the imported data structure
+            if (!importedData.version || !importedData.data) {
+                throw new Error('Invalid import file format');
+            }
+
+            // Version compatibility check
+            if (importedData.version !== "1.0") {
+                console.log(`Warning: Importing data from version ${importedData.version}`);
+            }
+
+            const { folders, snippets } = importedData.data;
+
+            // Validate folders
+            if (!Array.isArray(folders)) {
+                throw new Error('Invalid folders data');
+            }
+
+            // Validate snippets
+            if (!Array.isArray(snippets)) {
+                throw new Error('Invalid snippets data');
+            }
+
+            // Validate each folder has required fields
+            folders.forEach((folder: any, index: number) => {
+                if (!folder.id || !folder.name) {
+                    throw new Error(`Invalid folder data at index ${index}`);
+                }
+            });
+
+            // Validate each snippet has required fields
+            snippets.forEach((snippet: any, index: number) => {
+                if (!snippet.id || !snippet.name || !snippet.code || !snippet.folderId) {
+                    throw new Error(`Invalid snippet data at index ${index}`);
+                }
+            });
+
+            // Create a map of existing folders and snippets
+            const currentData = await this.getAllData();
+            const existingFolders = new Map(currentData.folders.map(f => [f.id, f]));
+            const existingSnippets = new Map(currentData.snippets.map(s => [s.id, s]));
+
+            // Merge folders
+            const mergedFolders = new Map<string, Folder>();
+            
+            // Add existing folders
+            existingFolders.forEach((folder, id) => {
+                mergedFolders.set(id, folder);
+            });
+
+            // Add/update imported folders
+            folders.forEach((folder: Folder) => {
+                mergedFolders.set(folder.id, {
+                    id: folder.id,
+                    name: folder.name
+                });
+            });
+
+            // Merge snippets
+            const mergedSnippets = new Map<string, Snippet>();
+            
+            // Add existing snippets
+            existingSnippets.forEach((snippet, id) => {
+                mergedSnippets.set(id, snippet);
+            });
+
+            // Add/update imported snippets
+            snippets.forEach((snippet: Snippet) => {
+                mergedSnippets.set(snippet.id, {
+                    id: snippet.id,
+                    name: snippet.name,
+                    code: snippet.code,
+                    notes: snippet.notes || "",
+                    folderId: snippet.folderId,
+                    language: snippet.language || "plaintext"
+                });
+            });
+
+            // Convert maps back to arrays
+            const finalData = {
+                folders: Array.from(mergedFolders.values()),
+                snippets: Array.from(mergedSnippets.values())
+            };
+
+            // Save the merged data
+            await this.syncData(finalData);
+
+            console.log('Import completed successfully:', {
+                folders: finalData.folders.length,
+                snippets: finalData.snippets.length
+            });
+        } catch (error: any) {
+            console.error('Error importing data:', error);
+            throw new Error(`Failed to import data: ${error.message}`);
         }
     }
 } 

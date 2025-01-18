@@ -4,7 +4,7 @@
     "description": "Snippy Snippets Manager for VSCode",
     "version": "0.0.1",
     "engines": {
-        "vscode": "^1.85.0"
+        "vscode": "^1.87.0"
     },
     "categories": [
         "Other"
@@ -36,22 +36,22 @@
                 {
                     "command": "snippets.search",
                     "when": "view == snippetsExplorer",
-                    "group": "navigation@0"
+                    "group": "navigation@1"
                 },
                 {
                     "command": "snippets.clearSearch",
                     "when": "view == snippetsExplorer",
-                    "group": "navigation@1"
+                    "group": "navigation@2"
                 },
                 {
                     "command": "snippets.addFolder",
                     "when": "view == snippetsExplorer",
-                    "group": "navigation@2"
+                    "group": "navigation@3"
                 },
                 {
                     "command": "snippets.manageSettings",
                     "when": "view == snippetsExplorer",
-                    "group": "navigation@3"
+                    "group": "navigation@4"
                 }
             ],
             "view/item/context": [
@@ -62,7 +62,12 @@
                 },
                 {
                     "command": "snippets.deleteItem",
-                    "when": "view == snippetsExplorer",
+                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "group": "inline"
+                },
+                {
+                    "command": "snippets.deleteItem",
+                    "when": "view == snippetsExplorer && viewItem == snippet",
                     "group": "inline"
                 },
                 {
@@ -74,39 +79,26 @@
                     "command": "snippets.renameSnippet",
                     "when": "view == snippetsExplorer && viewItem == snippet",
                     "group": "1_modification"
-                },
-                {
-                    "command": "snippets.deleteItem",
-                    "when": "view == snippetsExplorer",
-                    "group": "9_cutcopypaste"
                 }
             ],
             "commandPalette": [
                 {
-                    "command": "snippets.pushToGist",
-                    "when": "false"
+                    "command": "snippets.importSnippets",
+                    "when": "view == snippetsExplorer"
                 },
                 {
-                    "command": "snippets.pullFromGist",
-                    "when": "false"
+                    "command": "snippets.exportSnippets",
+                    "when": "view == snippetsExplorer"
                 }
             ],
-            "snippets.githubMenu": [
+            "snippets.settingsMenu": [
                 {
-                    "command": "snippets.pushToGist",
-                    "group": "sync@1"
+                    "command": "snippets.importSnippets",
+                    "group": "data@1"
                 },
                 {
-                    "command": "snippets.pullFromGist",
-                    "group": "sync@2"
-                },
-                {
-                    "command": "snippets.manageGitHubToken",
-                    "group": "config@1"
-                },
-                {
-                    "command": "snippets.resetGithubConfig",
-                    "group": "config@2"
+                    "command": "snippets.exportSnippets",
+                    "group": "data@2"
                 }
             ]
         },
@@ -141,6 +133,16 @@
                 "title": "Open Snippet"
             },
             {
+                "command": "snippets.renameFolder",
+                "title": "Rename Folder",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "snippets.renameSnippet",
+                "title": "Rename Snippet",
+                "icon": "$(edit)"
+            },
+            {
                 "command": "snippets.configureSync",
                 "title": "Configure GitHub Sync"
             },
@@ -155,37 +157,32 @@
                 "icon": "$(cloud-download)"
             },
             {
-                "command": "snippets.renameFolder",
-                "title": "Rename Folder"
+                "command": "snippets.manageGitHubToken",
+                "title": "Manage GitHub Token",
+                "icon": "$(key)"
             },
             {
-                "command": "snippets.renameSnippet",
-                "title": "Rename Snippet"
+                "command": "snippets.resetGithubConfig",
+                "title": "Reset GitHub Configuration"
+            },
+            {
+                "command": "snippets.configureBackupFolder",
+                "title": "Configure Backup Folder"
+            },
+            {
+                "command": "snippets.importSnippets",
+                "title": "Import Snippets",
+                "category": "Snippets"
+            },
+            {
+                "command": "snippets.exportSnippets",
+                "title": "Export Snippets",
+                "category": "Snippets"
             },
             {
                 "command": "snippets.manageSettings",
                 "title": "Manage Settings",
                 "icon": "$(gear)"
-            },
-            {
-                "command": "snippets.resetGithubConfig",
-                "title": "Reset GitHub Configuration",
-                "category": "Snippets"
-            },
-            {
-                "command": "snippets.manageGitHubToken",
-                "title": "Manage GitHub Token",
-                "icon": "$(account)"
-            },
-            {
-                "command": "snippets.pushToGist",
-                "title": "Push to GitHub Gist",
-                "icon": "$(cloud-upload)"
-            },
-            {
-                "command": "snippets.pullFromGist",
-                "title": "Pull from GitHub Gist",
-                "icon": "$(cloud-download)"
             }
         ],
         "configuration": {
@@ -222,7 +219,7 @@
     },
     "devDependencies": {
         "@types/node": "^16.18.123",
-        "@types/vscode": "^1.96.0",
+        "@types/vscode": "^1.87.0",
         "typescript": "^5.7.3"
     },
     "dependencies": {
