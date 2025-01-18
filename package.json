@@ -2,11 +2,25 @@
     "name": "snippy-snippets",
     "displayName": "Snippy Snippets Manager",
     "description": "Snippy Snippets Manager for VSCode",
-    "version": "0.0.1",
+    "version": "1.0.0",
+    "publisher": "Peter Csipkay",
+    "repository": {
+        "type": "git",
+        "url": "https://snippypro.com"
+    },
+    "bugs": {
+        "url": "https://snippypro.com"
+    },
+    "homepage": "https://snippypro.com",
+    "author": {
+        "name": "Peter Csipkay"
+    },
+    "license": "MIT",
     "engines": {
         "vscode": "^1.87.0"
     },
     "categories": [
+        "Programming Languages",
         "Other"
     ],
     "activationEvents": [
@@ -18,7 +32,7 @@
             "activitybar": [
                 {
                     "id": "snippets-explorer",
-                    "title": "Snippets Explorer",
+                    "title": "Snippy Snippets Manager",
                     "icon": "resources/snippets.svg"
                 }
             ]
@@ -27,7 +41,7 @@
             "snippets-explorer": [
                 {
                     "id": "snippetsExplorer",
-                    "name": "Snippets"
+                    "name": "Snippy"
                 }
             ]
         },

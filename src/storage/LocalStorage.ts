@@ -427,14 +427,17 @@ export class LocalStorage {
 
             // Validate each folder has required fields
             folders.forEach((folder: any, index: number) => {
-                if (!folder.id || !folder.name) {
+                if (!folder.id || typeof folder.id !== 'string' || !folder.name || typeof folder.name !== 'string') {
                     throw new Error(`Invalid folder data at index ${index}`);
                 }
             });
 
             // Validate each snippet has required fields
             snippets.forEach((snippet: any, index: number) => {
-                if (!snippet.id || !snippet.name || !snippet.code || !snippet.folderId) {
+                if (!snippet.id || typeof snippet.id !== 'string' || 
+                    !snippet.name || typeof snippet.name !== 'string' || 
+                    typeof snippet.code !== 'string' || // code can be empty but must be string
+                    !snippet.folderId || typeof snippet.folderId !== 'string') {
                     throw new Error(`Invalid snippet data at index ${index}`);
                 }
             });
@@ -473,7 +476,7 @@ export class LocalStorage {
                 mergedSnippets.set(snippet.id, {
                     id: snippet.id,
                     name: snippet.name,
-                    code: snippet.code,
+                    code: snippet.code || "",
                     notes: snippet.notes || "",
                     folderId: snippet.folderId,
                     language: snippet.language || "plaintext"

@@ -54,9 +54,76 @@ export class SnippetEditor {
         language?: string;
         tags?: string[];
     }): Promise<string> {
-        // Get all available language IDs from VS Code
-        const languages = await vscode.languages.getLanguages();
-        
+        // Language options for the dropdown
+        const languageOptions = [
+            // Popular Languages
+            { label: 'JavaScript', value: 'javascript' },
+            { label: 'TypeScript', value: 'typescript' },
+            { label: 'Python', value: 'python' },
+            { label: 'Java', value: 'java' },
+            { label: 'C#', value: 'csharp' },
+            { label: 'C++', value: 'cpp' },
+            { label: 'C', value: 'c' },
+            { label: 'Swift', value: 'swift' },
+            { label: 'Go', value: 'go' },
+            { label: 'Rust', value: 'rust' },
+            { label: 'PHP', value: 'php' },
+            { label: 'Ruby', value: 'ruby' },
+            { separator: true, label: '──────────' },
+
+            // Web Development
+            { label: 'HTML', value: 'html' },
+            { label: 'CSS', value: 'css' },
+            { label: 'SCSS', value: 'scss' },
+            { label: 'SASS', value: 'sass' },
+            { label: 'Less', value: 'less' },
+            { label: 'PostCSS', value: 'postcss' },
+            { label: 'Tailwind CSS', value: 'tailwindcss' },
+            { separator: true, label: '──────────' },
+
+            // Web Frameworks
+            { label: 'React', value: 'react' },
+            { label: 'Vue', value: 'vue' },
+            { label: 'Angular', value: 'angular' },
+            { label: 'Svelte', value: 'svelte' },
+            { label: 'Astro', value: 'astro' },
+            { separator: true, label: '──────────' },
+
+            // Data & Config
+            { label: 'JSON', value: 'json' },
+            { label: 'XML', value: 'xml' },
+            { label: 'YAML', value: 'yaml' },
+            { label: 'TOML', value: 'toml' },
+            { label: 'INI', value: 'ini' },
+            { label: 'ENV', value: 'env' },
+            { separator: true, label: '──────────' },
+
+            // Shell & Scripting
+            { label: 'Shell Script', value: 'shell' },
+            { label: 'Bash', value: 'bash' },
+            { label: 'PowerShell', value: 'powershell' },
+            { label: 'Batch', value: 'batch' },
+            { separator: true, label: '──────────' },
+
+            // Database
+            { label: 'SQL', value: 'sql' },
+            { label: 'PL/SQL', value: 'plsql' },
+            { label: 'MongoDB', value: 'mongodb' },
+            { separator: true, label: '──────────' },
+
+            // Other Languages
+            { label: 'Kotlin', value: 'kotlin' },
+            { label: 'Dart', value: 'dart' },
+            { label: 'R', value: 'r' },
+            { label: 'Perl', value: 'perl' },
+            { label: 'Lua', value: 'lua' },
+            { label: 'Scala', value: 'scala' },
+            { label: 'GraphQL', value: 'graphql' },
+            { label: 'Markdown', value: 'markdown' },
+            { label: 'LaTeX', value: 'latex' },
+            { label: 'Plain Text', value: 'plaintext' }
+        ];
+
         return `<!DOCTYPE html>
         <html>
             <head>
@@ -158,8 +225,8 @@ export class SnippetEditor {
                     <h2>${snippet.name}</h2>
                     <select id="language">
                         <option value="">Select a language...</option>
-                        ${languages.map(lang => 
-                            `<option value="${lang}" ${lang === snippet.language ? 'selected' : ''}>${lang}</option>`
+                        ${languageOptions.map(lang => 
+                            `<option value="${lang.value}" ${lang.value === snippet.language ? 'selected' : ''}>${lang.label}</option>`
                         ).join('')}
                     </select>
                 </div>
