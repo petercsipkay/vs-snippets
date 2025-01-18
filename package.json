@@ -49,24 +49,9 @@
                     "group": "navigation@2"
                 },
                 {
-                    "command": "snippets.syncToGist",
+                    "command": "snippets.manageSettings",
                     "when": "view == snippetsExplorer",
                     "group": "navigation@3"
-                },
-                {
-                    "command": "snippets.exportSnippets",
-                    "when": "view == snippetsExplorer",
-                    "group": "navigation@4"
-                },
-                {
-                    "command": "snippets.manageGitHubToken",
-                    "when": "view == snippetsExplorer",
-                    "group": "navigation@5"
-                },
-                {
-                    "command": "snippets.configureBackupFolder",
-                    "when": "view == snippetsExplorer",
-                    "group": "navigation@6"
                 }
             ],
             "view/item/context": [
@@ -94,6 +79,34 @@
                     "command": "snippets.deleteItem",
                     "when": "view == snippetsExplorer",
                     "group": "9_cutcopypaste"
+                }
+            ],
+            "commandPalette": [
+                {
+                    "command": "snippets.pushToGist",
+                    "when": "false"
+                },
+                {
+                    "command": "snippets.pullFromGist",
+                    "when": "false"
+                }
+            ],
+            "snippets.githubMenu": [
+                {
+                    "command": "snippets.pushToGist",
+                    "group": "sync@1"
+                },
+                {
+                    "command": "snippets.pullFromGist",
+                    "group": "sync@2"
+                },
+                {
+                    "command": "snippets.manageGitHubToken",
+                    "group": "config@1"
+                },
+                {
+                    "command": "snippets.resetGithubConfig",
+                    "group": "config@2"
                 }
             ]
         },
@@ -132,13 +145,14 @@
                 "title": "Configure GitHub Sync"
             },
             {
-                "command": "snippets.syncToGist",
-                "title": "Sync to GitHub Gist",
-                "icon": "$(sync)"
+                "command": "snippets.pushToGist",
+                "title": "Push to GitHub Gist",
+                "icon": "$(cloud-upload)"
             },
             {
-                "command": "snippets.syncFromGist",
-                "title": "Sync from GitHub Gist"
+                "command": "snippets.pullFromGist",
+                "title": "Pull from GitHub Gist",
+                "icon": "$(cloud-download)"
             },
             {
                 "command": "snippets.renameFolder",
@@ -149,9 +163,9 @@
                 "title": "Rename Snippet"
             },
             {
-                "command": "snippets.exportSnippets",
-                "title": "Export Snippets",
-                "icon": "$(export)"
+                "command": "snippets.manageSettings",
+                "title": "Manage Settings",
+                "icon": "$(gear)"
             },
             {
                 "command": "snippets.resetGithubConfig",
@@ -164,9 +178,14 @@
                 "icon": "$(account)"
             },
             {
-                "command": "snippets.configureBackupFolder",
-                "title": "Configure Backup Folder",
-                "icon": "$(folder)"
+                "command": "snippets.pushToGist",
+                "title": "Push to GitHub Gist",
+                "icon": "$(cloud-upload)"
+            },
+            {
+                "command": "snippets.pullFromGist",
+                "title": "Pull from GitHub Gist",
+                "icon": "$(cloud-download)"
             }
         ],
         "configuration": {
@@ -187,6 +206,11 @@
                     "type": "string",
                     "default": "",
                     "description": "Folder path where snippet backups will be saved"
+                },
+                "snippets.storageLocation": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Directory where snippets and their data will be stored"
                 }
             }
         }

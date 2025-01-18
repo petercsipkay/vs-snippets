@@ -298,6 +298,72 @@ export function activate(context: vscode.ExtensionContext) {
             treeDataProvider.setSearchQuery('');
         }),
 
+        vscode.commands.registerCommand('snippets.manageSettings', async () => {
+            const items: vscode.QuickPickItem[] = [
+                {
+                    label: "$(cloud-upload) Push to GitHub Gist",
+                    description: "Upload your snippets to GitHub Gist",
+                    detail: "Sync your snippets to GitHub"
+                },
+                {
+                    label: "$(cloud-download) Pull from GitHub Gist",
+                    description: "Download snippets from GitHub Gist",
+                    detail: "Get your snippets from GitHub"
+                },
+                {
+                    label: "$(key) Manage GitHub Token",
+                    description: "Configure GitHub authentication",
+                    detail: "Set up or update your GitHub access"
+                },
+                {
+                    label: "$(sync-ignored) Reset GitHub Configuration",
+                    description: "Clear GitHub settings",
+                    detail: "Remove GitHub token and settings"
+                },
+                {
+                    label: "$(export) Export Snippets",
+                    description: "Save snippets to a JSON file",
+                    detail: "Backup your snippets locally"
+                },
+                {
+                    label: "$(folder) Configure Backup Folder",
+                    description: "Set automatic backup location",
+                    detail: "Choose where to save snippet backups"
+                }
+            ];
+
+            const selection = await vscode.window.showQuickPick(items, {
+                placeHolder: 'Snippets Manager Settings',
+                matchOnDescription: true,
+                matchOnDetail: true
+            });
+
+            if (!selection) {
+                return;
+            }
+
+            switch (selection.label) {
+                case "$(cloud-upload) Push to GitHub Gist":
+                    await vscode.commands.executeCommand('snippets.pushToGist');
+                    break;
+                case "$(cloud-download) Pull from GitHub Gist":
+                    await vscode.commands.executeCommand('snippets.pullFromGist');
+                    break;
+                case "$(key) Manage GitHub Token":
+                    await vscode.commands.executeCommand('snippets.manageGitHubToken');
+                    break;
+                case "$(sync-ignored) Reset GitHub Configuration":
+                    await vscode.commands.executeCommand('snippets.resetGithubConfig');
+                    break;
+                case "$(export) Export Snippets":
+                    await vscode.commands.executeCommand('snippets.exportSnippets');
+                    break;
+                case "$(folder) Configure Backup Folder":
+                    await vscode.commands.executeCommand('snippets.configureBackupFolder');
+                    break;
+            }
+        }),
+
         vscode.commands.registerCommand('snippets.updateSnippet', async (update: {
             id: string;
             code?: string;
@@ -312,6 +378,85 @@ export function activate(context: vscode.ExtensionContext) {
                 await BackupManager.backupSnippet(snippet);
             }
             treeDataProvider.refresh();
+        }),
+
+        vscode.commands.registerCommand('snippets.pushToGist', async () => {
+            try {
+                // Check if GitHub sync is configured
+                const config = vscode.workspace.getConfiguration('snippets');
+                const token = await config.get('githubToken');
+                if (!token) {
+                    const configure = 'Configure GitHub Sync';
+                    const response = await vscode.window.showWarningMessage(
+                        'GitHub sync is not configured. Would you like to configure it now?',
+                        configure
+                    );
+                    if (response === configure) {
+                        await gistStorage.configure();
+                        return;
+                    }
+                    return;
+                }
+
+                // Show progress notification
+                await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: "Pushing snippets to GitHub Gist...",
+                    cancellable: false
+                }, async () => {
+                    const data = await localStorage.getAllData();
+                    await gistStorage.sync(data);
+                });
+                
+                const gistId = await config.get('gistId');
+                vscode.window.showInformationMessage(
+                    `Successfully pushed to GitHub Gist${gistId ? ` (ID: ${gistId})` : ''}`,
+                    'Open in Browser'
+                ).then(selection => {
+                    if (selection === 'Open in Browser' && gistId) {
+                        vscode.env.openExternal(vscode.Uri.parse(`https://gist.github.com/${gistId}`));
+                    }
+                });
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`Failed to push to GitHub Gist: ${error.message}`);
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.pullFromGist', async () => {
+            try {
+                // Check if GitHub sync is configured
+                const config = vscode.workspace.getConfiguration('snippets');
+                const token = await config.get('githubToken');
+                if (!token) {
+                    const configure = 'Configure GitHub Sync';
+                    const response = await vscode.window.showWarningMessage(
+                        'GitHub sync is not configured. Would you like to configure it now?',
+                        configure
+                    );
+                    if (response === configure) {
+                        await gistStorage.configure();
+                        return;
+                    }
+                    return;
+                }
+
+                // Show progress notification
+                await vscode.window.withProgress({
+                    location: vscode.ProgressLocation.Notification,
+                    title: "Pulling snippets from GitHub Gist...",
+                    cancellable: false
+                }, async () => {
+                    const data = await gistStorage.load();
+                    if (data) {
+                        await localStorage.syncData(data);
+                        treeDataProvider.refresh();
+                    }
+                });
+                
+                vscode.window.showInformationMessage('Successfully pulled snippets from GitHub Gist');
+            } catch (error: any) {
+                vscode.window.showErrorMessage(`Failed to pull from GitHub Gist: ${error.message}`);
+            }
         }),
 
         vscode.commands.registerCommand('snippets.configureBackupFolder', async () => {
