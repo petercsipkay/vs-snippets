@@ -8,17 +8,21 @@ import * as fs from 'fs';
 import { SnippetTreeItem } from './sidebar/SnippetTreeItem';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Activating extension');  // Debug log
+    console.log('Snippy Extension: Starting activation...');  // Debug log
     
     const localStorage = new LocalStorage(context.globalState);
     const gistStorage = new GistStorage();
     const treeDataProvider = new SnippetTreeDataProvider(localStorage, gistStorage);
 
+    console.log('Snippy Extension: Registering tree data provider...');
     vscode.window.registerTreeDataProvider('snippetsExplorer', treeDataProvider);
 
+    console.log('Snippy Extension: Registering commands...');
+    
     // Register commands
-    context.subscriptions.push(
+    const disposables = [
         vscode.commands.registerCommand('snippets.addFolder', async () => {
+            console.log('Snippy Extension: Add folder command triggered');
             const folderName = await vscode.window.showInputBox({
                 placeHolder: 'Enter folder name'
             });
@@ -272,6 +276,7 @@ export function activate(context: vscode.ExtensionContext) {
         }),
 
         vscode.commands.registerCommand('snippets.search', async () => {
+            console.log('Snippy Extension: Search command triggered');
             const query = await vscode.window.showInputBox({
                 placeHolder: 'Search snippets by name or tag...',
                 prompt: 'Enter text to search snippets'
@@ -283,6 +288,7 @@ export function activate(context: vscode.ExtensionContext) {
         }),
 
         vscode.commands.registerCommand('snippets.clearSearch', () => {
+            console.log('Snippy Extension: Clear search command triggered');
             treeDataProvider.setSearchQuery('');
         }),
 
@@ -435,7 +441,9 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage(`Failed to export snippets: ${error.message}`);
             }
         })
-    );
+    ];
 
-    console.log('Extension activated');  // Debug log
+    context.subscriptions.push(...disposables);
+
+    console.log('Snippy Extension: Activation complete');  // Debug log
 } 
