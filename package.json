@@ -4,6 +4,7 @@
     "description": "Snippy Snippets Manager for VSCode",
     "version": "1.0.1",
     "publisher": "Peter Csipkay",
+    "icon": "resources/logo.png",
     "repository": {
         "type": "git",
         "url": "https://github.com/csipkay/snippy-snippets"
@@ -35,7 +36,7 @@
                 {
                     "id": "snippets-explorer",
                     "title": "Snippy Snippets Manager",
-                    "icon": "resources/snippets.svg"
+                    "icon": "resources/logo.svg"
                 }
             ]
         },
