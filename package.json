@@ -1,7 +1,7 @@
 {
     "name": "snippy-snippets",
-    "displayName": "Snippy Snippets Manager",
-    "description": "Snippy Snippets Manager for VSCode",
+    "displayName": "Snippy Code Snippets Manager",
+    "description": "Snippy Code Snippets Manager for VSCode",
     "version": "1.0.1",
     "publisher": "Peter Csipkay",
     "icon": "resources/logo.png",
@@ -116,6 +116,10 @@
                 {
                     "command": "snippets.exportSnippets",
                     "group": "data@2"
+                },
+                {
+                    "command": "snippets.getHelp",
+                    "group": "help@99"
                 }
             ]
         },
@@ -201,6 +205,11 @@
                 "command": "snippets.manageSettings",
                 "title": "Manage Settings",
                 "icon": "$(gear)"
+            },
+            {
+                "command": "snippets.getHelp",
+                "title": "Get Help",
+                "icon": "$(question)"
             }
         ],
         "configuration": {

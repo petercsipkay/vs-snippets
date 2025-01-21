@@ -440,6 +440,10 @@ export function activate(context: vscode.ExtensionContext) {
                 console.error('Export error:', error);
                 vscode.window.showErrorMessage(`Failed to export snippets: ${error.message}`);
             }
+        }),
+
+        vscode.commands.registerCommand('snippets.getHelp', () => {
+            vscode.env.openExternal(vscode.Uri.parse('http://snippypro.com/'));
         })
     ];
 
