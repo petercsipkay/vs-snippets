@@ -2,20 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-
-interface Folder {
-    id: string;
-    name: string;
-}
-
-interface Snippet {
-    id: string;
-    name: string;
-    code: string;
-    notes: string;
-    folderId: string;
-    language?: string;
-}
+import { Folder, Snippet } from './types';
 
 interface SnippetUpdate {
     id: string;
@@ -23,182 +10,119 @@ interface SnippetUpdate {
     notes?: string;
     language?: string;
     tags?: string[];
+    folderId?: string;
 }
 
 export class LocalStorage {
-    private storageDir: string | null = null;
     private initialized: boolean = false;
+    private storagePath: string;
 
-    constructor(private storage: vscode.Memento) {
-        // Initialize storage asynchronously and track completion
-        this.initializeStorage().then(() => {
-            this.initialized = true;
-            console.log('Storage initialization complete');
-        }).catch(err => {
-            console.error('Failed to initialize storage:', err);
+    constructor() {
+        this.storagePath = path.join(os.homedir(), '.vscode', 'snippets');
+        this.initializeStorage().catch(error => {
+            console.error('Failed to initialize storage:', error);
         });
     }
 
-    private async waitForInitialization() {
-        if (!this.initialized) {
-            console.log('Waiting for storage initialization...');
-            await new Promise<void>((resolve) => {
-                const check = () => {
-                    if (this.initialized) {
-                        resolve();
-                    } else {
-                        setTimeout(check, 100);
-                    }
-                };
-                check();
-            });
-            console.log('Storage initialization complete');
-        }
-    }
-
-    private async initializeStorage() {
+    private async initializeStorage(): Promise<void> {
         try {
-            console.log('Initializing storage...');
-            // Try to get configured storage location
-            const config = vscode.workspace.getConfiguration('snippets');
-            let configuredPath = await config.get<string>('storageLocation');
+            // Create storage directory if it doesn't exist
+            await fs.promises.mkdir(this.storagePath, { recursive: true });
 
-            if (!configuredPath) {
-                // Try different locations in order of preference
-                const possibleLocations = [
-                    path.join(os.homedir(), 'Documents', 'CodeSnippets'),
-                    path.join(os.homedir(), '.vscode', 'snippets'),
-                    path.join(os.homedir(), '.snippets'),
-                    path.join(process.env.HOME || os.homedir(), '.config', 'code-snippets'),
-                    path.join(os.homedir(), 'Library', 'Application Support', 'CodeSnippets')
-                ];
-
-                for (const location of possibleLocations) {
-                    try {
-                        console.log(`Trying storage location: ${location}`);
-                        await fs.promises.mkdir(location, { recursive: true, mode: 0o755 });
-                        await fs.promises.access(location, fs.constants.W_OK);
-                        configuredPath = location;
-                        await config.update('storageLocation', location, true);
-                        console.log(`Successfully configured storage at: ${location}`);
-                        break;
-                    } catch (err) {
-                        console.log(`Failed to use location ${location}:`, err);
-                        continue;
-                    }
-                }
-
-                if (!configuredPath) {
-                    console.error('Could not find a writable storage location');
-                    this.storageDir = null;
-                    return;
-                }
+            // Create folders.json if it doesn't exist
+            const foldersPath = path.join(this.storagePath, 'folders.json');
+            if (!await this.fileExists(foldersPath)) {
+                await fs.promises.writeFile(foldersPath, '[]');
             }
 
-            // Verify the configured path is accessible
-            try {
-                console.log(`Verifying storage location: ${configuredPath}`);
-                await fs.promises.mkdir(configuredPath, { recursive: true, mode: 0o755 });
-                await fs.promises.access(configuredPath, fs.constants.W_OK);
-                this.storageDir = configuredPath;
-                console.log('Storage directory verified and accessible');
-
-                // Initialize empty files if they don't exist
-                const foldersPath = path.join(this.storageDir, 'folders.json');
-                const snippetsPath = path.join(this.storageDir, 'snippets.json');
-
-                if (!fs.existsSync(foldersPath)) {
-                    await fs.promises.writeFile(foldersPath, '[]', { mode: 0o600 });
-                }
-                if (!fs.existsSync(snippetsPath)) {
-                    await fs.promises.writeFile(snippetsPath, '[]', { mode: 0o600 });
-                }
-            } catch (err) {
-                console.error('Failed to access configured storage location:', err);
-                this.storageDir = null;
+            // Create snippets.json if it doesn't exist
+            const snippetsPath = path.join(this.storagePath, 'snippets.json');
+            if (!await this.fileExists(snippetsPath)) {
+                await fs.promises.writeFile(snippetsPath, '[]');
             }
-        } catch (err) {
-            console.error('Error initializing storage:', err);
-            this.storageDir = null;
+
+            this.initialized = true;
+        } catch (error) {
+            console.error('Error initializing storage:', error);
+            throw error;
         }
     }
 
-    private async ensureStorageInitialized(): Promise<boolean> {
-        if (!this.storageDir) {
+    private async fileExists(filePath: string): Promise<boolean> {
+        try {
+            await fs.promises.access(filePath);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private async waitForInitialization(): Promise<void> {
+        if (!this.initialized) {
             await this.initializeStorage();
         }
-        return !!this.storageDir;
     }
 
     private async getFoldersData(): Promise<Folder[]> {
-        try {
-            if (!await this.ensureStorageInitialized()) {
-                return this.storage.get('folders', []);
-            }
-
-            const foldersPath = path.join(this.storageDir!, 'folders.json');
-            try {
-                const data = await fs.promises.readFile(foldersPath, 'utf8');
-                return JSON.parse(data);
-            } catch (err) {
-                // If file doesn't exist or is invalid, return empty array
-                return [];
-            }
-        } catch (err) {
-            // Fallback to memento storage
-            return this.storage.get('folders', []);
-        }
+        await this.waitForInitialization();
+        const foldersPath = path.join(this.storagePath, 'folders.json');
+        const data = await fs.promises.readFile(foldersPath, 'utf8');
+        return JSON.parse(data);
     }
 
     private async getSnippetsData(): Promise<Snippet[]> {
-        try {
-            if (!await this.ensureStorageInitialized()) {
-                return this.storage.get('snippets', []);
-            }
-
-            const snippetsPath = path.join(this.storageDir!, 'snippets.json');
-            try {
-                const data = await fs.promises.readFile(snippetsPath, 'utf8');
-                return JSON.parse(data);
-            } catch (err) {
-                // If file doesn't exist or is invalid, return empty array
-                return [];
-            }
-        } catch (err) {
-            // Fallback to memento storage
-            return this.storage.get('snippets', []);
-        }
+        await this.waitForInitialization();
+        const snippetsPath = path.join(this.storagePath, 'snippets.json');
+        const data = await fs.promises.readFile(snippetsPath, 'utf8');
+        return JSON.parse(data);
     }
 
     private async saveFoldersData(folders: Folder[]): Promise<void> {
-        try {
-            if (!await this.ensureStorageInitialized()) {
-                await this.storage.update('folders', folders);
-                return;
-            }
+        await this.waitForInitialization();
+        const foldersPath = path.join(this.storagePath, 'folders.json');
+        await fs.promises.writeFile(foldersPath, JSON.stringify(folders, null, 2));
 
-            const foldersPath = path.join(this.storageDir!, 'folders.json');
-            await fs.promises.writeFile(foldersPath, JSON.stringify(folders, null, 2), { mode: 0o600 });
-        } catch (err) {
-            console.error('Failed to save folders:', err);
-            // Fallback to memento storage
-            await this.storage.update('folders', folders);
-        }
+        // Sync to backup file if configured
+        await this.saveToBackup();
     }
 
     private async saveSnippetsData(snippets: Snippet[]): Promise<void> {
-        try {
-            if (!await this.ensureStorageInitialized()) {
-                await this.storage.update('snippets', snippets);
-                return;
-            }
+        await this.waitForInitialization();
+        const snippetsPath = path.join(this.storagePath, 'snippets.json');
+        await fs.promises.writeFile(snippetsPath, JSON.stringify(snippets, null, 2));
 
-            const snippetsPath = path.join(this.storageDir!, 'snippets.json');
-            await fs.promises.writeFile(snippetsPath, JSON.stringify(snippets, null, 2), { mode: 0o600 });
-        } catch (err) {
-            console.error('Failed to save snippets:', err);
-            // Fallback to memento storage
-            await this.storage.update('snippets', snippets);
+        // Sync to backup file if configured
+        await this.saveToBackup();
+    }
+
+    // New helper method to save everything to a single backup file
+    private async saveToBackup(): Promise<void> {
+        const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
+        if (!backupFolder) {
+            return;
+        }
+
+        try {
+            // Get all current data
+            const data = await this.getAllData();
+            
+            // Convert folders to have type='folder'
+            const folders = data.folders.map(folder => ({
+                ...folder,
+                type: 'folder'
+            }));
+
+            // Combine into a single array
+            const combinedData = [...folders, ...data.snippets];
+
+            // Save to the backup file
+            const backupPath = path.join(backupFolder, 'snippets.json');
+            await fs.promises.mkdir(backupFolder, { recursive: true });
+            await fs.promises.writeFile(backupPath, JSON.stringify(combinedData, null, 2));
+            
+            console.log('[DEBUG] Saved to backup file:', backupPath);
+        } catch (error) {
+            console.error('[DEBUG] Error saving to backup:', error);
         }
     }
 
@@ -206,60 +130,71 @@ export class LocalStorage {
         return this.getFoldersData();
     }
 
-    async getSnippets(folderId: string): Promise<Snippet[]> {
-        const snippets = await this.getSnippetsData();
-        return snippets.filter(s => s.folderId === folderId);
+    async getSubFolders(parentId: string): Promise<Folder[]> {
+        const folders = await this.getFoldersData();
+        return folders.filter(f => f.parentId === parentId);
+    }
+
+    async getRootFolders(): Promise<Folder[]> {
+        const folders = await this.getFoldersData();
+        return folders.filter(f => f.parentId === null);
+    }
+
+    async getSnippets(): Promise<Snippet[]> {
+        return this.getSnippetsData();
     }
 
     async getAllSnippets(): Promise<Snippet[]> {
         return this.getSnippetsData();
     }
 
-    async addFolder(name: string): Promise<void> {
-        const folders = await this.getFoldersData();
-        folders.push({
+    async addFolder(name: string, parentId: string | null = null, type: 'primary' | 'secondary' = 'primary'): Promise<Folder> {
+        await this.waitForInitialization();
+        const newFolder: Folder = {
             id: Date.now().toString(),
-            name
-        });
+            name,
+            parentId,
+            type
+        };
+
+        const folders = await this.getFolders();
+        folders.push(newFolder);
         await this.saveFoldersData(folders);
+        return newFolder;
     }
 
-    async addSnippet(snippet: Partial<Snippet>): Promise<void> {
-        const snippets = await this.getSnippetsData();
-        snippets.push({
-            ...snippet,
-            id: Date.now().toString()
-        } as Snippet);
+    async addSnippet(snippet: Omit<Snippet, 'id'>): Promise<Snippet> {
+        await this.waitForInitialization();
+        const newSnippet: Snippet = {
+            id: Date.now().toString(),
+            ...snippet
+        };
+
+        const snippets = await this.getSnippets();
+        snippets.push(newSnippet);
         await this.saveSnippetsData(snippets);
+        return newSnippet;
     }
 
-    async deleteFolder(folderId: string): Promise<void> {
-        const folders = await this.getFoldersData();
-        const snippets = await this.getSnippetsData();
-        
-        // Remove folder
-        const updatedFolders = folders.filter(f => f.id !== folderId);
-        await this.saveFoldersData(updatedFolders);
-        
+    async deleteFolder(id: string): Promise<void> {
+        await this.waitForInitialization();
+        const folders = await this.getFolders();
+        const snippets = await this.getSnippets();
+
+        // Remove the folder
+        const updatedFolders = folders.filter(folder => folder.id !== id);
         // Remove all snippets in the folder
-        const updatedSnippets = snippets.filter(s => s.folderId !== folderId);
+        const updatedSnippets = snippets.filter(snippet => snippet.folderId !== id);
+
+        await this.saveFoldersData(updatedFolders);
         await this.saveSnippetsData(updatedSnippets);
     }
 
-    async deleteSnippet(snippetId: string): Promise<void> {
-        try {
-            await this.waitForInitialization();
-            console.log('Deleting snippet with ID:', snippetId);
-            const snippets = await this.getSnippetsData();
-            console.log('Current snippets count:', snippets.length);
-            const updatedSnippets = snippets.filter(s => s.id !== snippetId);
-            console.log('Updated snippets count:', updatedSnippets.length);
-            await this.saveSnippetsData(updatedSnippets);
-            console.log('Snippet deleted successfully');
-        } catch (error) {
-            console.error('Error deleting snippet:', error);
-            throw error;
-        }
+    async deleteSnippet(id: string): Promise<void> {
+        await this.waitForInitialization();
+        const snippets = await this.getSnippets();
+        const updatedSnippets = snippets.filter(snippet => snippet.id !== id);
+        await this.saveSnippetsData(updatedSnippets);
     }
 
     async updateSnippet(update: SnippetUpdate): Promise<void> {
@@ -288,66 +223,9 @@ export class LocalStorage {
     }
 
     async syncData(data: { folders: Folder[]; snippets: Snippet[] }): Promise<void> {
-        try {
-            console.log('Starting data sync...');
-            console.log('Incoming data:', {
-                folders: data.folders.length,
-                snippets: data.snippets.length
-            });
-
-            // Get current data
-            const currentFolders = await this.getFoldersData();
-            const currentSnippets = await this.getSnippetsData();
-
-            console.log('Current data:', {
-                folders: currentFolders.length,
-                snippets: currentSnippets.length
-            });
-
-            // Merge folders
-            const mergedFolders = new Map<string, Folder>();
-            
-            // Add current folders
-            currentFolders.forEach(folder => {
-                mergedFolders.set(folder.id, folder);
-            });
-            
-            // Add/update new folders
-            data.folders.forEach(folder => {
-                mergedFolders.set(folder.id, folder);
-            });
-
-            // Merge snippets
-            const mergedSnippets = new Map<string, Snippet>();
-            
-            // Add current snippets
-            currentSnippets.forEach(snippet => {
-                mergedSnippets.set(snippet.id, snippet);
-            });
-            
-            // Add/update new snippets
-            data.snippets.forEach(snippet => {
-                mergedSnippets.set(snippet.id, snippet);
-            });
-
-            // Convert maps back to arrays
-            const finalFolders = Array.from(mergedFolders.values());
-            const finalSnippets = Array.from(mergedSnippets.values());
-
-            console.log('Merged data:', {
-                folders: finalFolders.length,
-                snippets: finalSnippets.length
-            });
-
-            // Save merged data
-            await this.saveFoldersData(finalFolders);
-            await this.saveSnippetsData(finalSnippets);
-
-            console.log('Sync completed successfully');
-        } catch (error: any) {
-            console.error('Error during sync:', error);
-            throw new Error(`Failed to sync data: ${error.message}`);
-        }
+        await this.waitForInitialization();
+        await this.saveFoldersData(data.folders);
+        await this.saveSnippetsData(data.snippets);
     }
 
     async renameFolder(folderId: string, newName: string): Promise<void> {
@@ -459,7 +337,9 @@ export class LocalStorage {
             folders.forEach((folder: Folder) => {
                 mergedFolders.set(folder.id, {
                     id: folder.id,
-                    name: folder.name
+                    name: folder.name,
+                    type: folder.type,
+                    parentId: folder.parentId
                 });
             });
 

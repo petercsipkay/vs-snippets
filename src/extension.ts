@@ -1,368 +1,95 @@
 import * as vscode from 'vscode';
-import { SnippetTreeDataProvider } from './sidebar/SnippetTreeDataProvider';
 import { LocalStorage } from './storage/LocalStorage';
 import { GistStorage } from './storage/GistStorage';
 import { SnippetEditor } from './editor/SnippetEditor';
-import { BackupManager } from './backup/BackupManager';
 import * as fs from 'fs';
 import { SnippetTreeItem } from './sidebar/SnippetTreeItem';
+import { SnippetTreeDataProvider } from './sidebar/SnippetTreeDataProvider';
+import * as path from 'path';
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Snippy Extension: Starting activation...');  // Debug log
-    
-    const localStorage = new LocalStorage(context.globalState);
-    const gistStorage = new GistStorage();
-    const treeDataProvider = new SnippetTreeDataProvider(localStorage, gistStorage);
+    const localStorage = new LocalStorage();
+    const gistStorage = new GistStorage(localStorage);
+    const treeDataProvider = new SnippetTreeDataProvider(localStorage);
 
-    console.log('Snippy Extension: Registering tree data provider...');
-    vscode.window.registerTreeDataProvider('snippetsExplorer', treeDataProvider);
+    // Check for auto-sync on startup
+    const config = vscode.workspace.getConfiguration('snippets');
+    if (config.get<boolean>('autoSyncOnStartup')) {
+        syncFromBackupFolder(localStorage, treeDataProvider).catch(error => {
+            console.error('Auto-sync failed:', error);
+        });
+    }
 
-    console.log('Snippy Extension: Registering commands...');
-    
+    // Register views
+    const treeView = vscode.window.createTreeView('snippetsExplorer', {
+        treeDataProvider,
+        showCollapseAll: false,
+        dragAndDropController: {
+            dropMimeTypes: ['application/vnd.code.tree.snippetsExplorer'],
+            dragMimeTypes: ['application/vnd.code.tree.snippetsExplorer'],
+            handleDrag: (source: readonly vscode.TreeItem[], treeDataTransfer: vscode.DataTransfer) => {
+                return treeDataProvider.handleDrag(source as SnippetTreeItem[], treeDataTransfer);
+            },
+            handleDrop: async (target: vscode.TreeItem, sources: vscode.DataTransfer) => {
+                return treeDataProvider.handleDrop(target as SnippetTreeItem, sources);
+            }
+        }
+    });
+
     // Register commands
     const disposables = [
-        vscode.commands.registerCommand('snippets.addFolder', async () => {
-            console.log('Snippy Extension: Add folder command triggered');
-            const folderName = await vscode.window.showInputBox({
-                placeHolder: 'Enter folder name'
-            });
-            if (folderName) {
-                await localStorage.addFolder(folderName);
-                treeDataProvider.refresh();
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.addSnippet', async (folder) => {
-            const snippetName = await vscode.window.showInputBox({
-                placeHolder: 'Enter snippet name'
-            });
-            if (snippetName) {
-                const snippet = {
-                    name: snippetName,
-                    code: '',
-                    notes: '',
-                    folderId: folder.id,
-                    language: 'plaintext'
-                };
-                await localStorage.addSnippet(snippet);
-                treeDataProvider.refresh();
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.deleteItem', async (item: SnippetTreeItem) => {
-            try {
-                console.log('Delete command triggered for:', item);
-                if (!item) {
-                    console.error('No item provided to delete command');
-                    return;
-                }
-
-                if (item.type === 'folder') {
-                    const answer = await vscode.window.showWarningMessage(
-                        `Are you sure you want to delete the folder "${item.label}" and all its snippets? This action cannot be undone.`,
-                        { modal: true },
-                        'Yes', 'No'
-                    );
-                    
-                    if (answer !== 'Yes') {
-                        return;
-                    }
-
-                    console.log('Deleting folder:', item.id);
-                    await localStorage.deleteFolder(item.id);
-                    console.log('Folder deletion successful');
-                } else {
-                    const answer = await vscode.window.showWarningMessage(
-                        `Are you sure you want to delete the snippet "${item.label}"?`,
-                        { modal: true },
-                        'Yes', 'No'
-                    );
-                    
-                    if (answer !== 'Yes') {
-                        return;
-                    }
-
-                    console.log('Deleting snippet:', item.id);
-                    await localStorage.deleteSnippet(item.id);
-                    console.log('Local deletion successful');
-
-                    // Also delete the gist if it exists
-                    try {
-                        await gistStorage.deleteSnippetGist(item.id);
-                        console.log('Gist deletion successful');
-                    } catch (error) {
-                        // Log but don't show error to user since the local delete succeeded
-                        console.error('Error deleting gist:', error);
-                    }
-                }
-                
-                console.log('Refreshing tree view');
-                treeDataProvider.refresh();
-            } catch (error) {
-                console.error('Error in delete command:', error);
-                vscode.window.showErrorMessage('Failed to delete item: ' + (error as Error).message);
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.openSnippet', async (item: SnippetTreeItem) => {
-            const snippet = await localStorage.getSnippet(item.id);
-            if (snippet) {
-                await SnippetEditor.show(snippet);
-            } else {
-                vscode.window.showErrorMessage('Snippet not found');
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.configureSync', async () => {
-            await gistStorage.configure();
-        }),
-
-        vscode.commands.registerCommand('snippets.pushToGist', async () => {
-            try {
-                // Check if GitHub sync is configured
-                const config = vscode.workspace.getConfiguration('snippets');
-                const token = await config.get('githubToken');
-                if (!token) {
-                    const configure = 'Configure GitHub Sync';
-                    const response = await vscode.window.showWarningMessage(
-                        'GitHub sync is not configured. Would you like to configure it now?',
-                        configure
-                    );
-                    if (response === configure) {
-                        await gistStorage.configure();
-                        return;
-                    }
-                    return;
-                }
-
-                // Show progress notification
-                await vscode.window.withProgress({
-                    location: vscode.ProgressLocation.Notification,
-                    title: "Pushing snippets to GitHub Gist...",
-                    cancellable: false
-                }, async () => {
-                    const data = await localStorage.getAllData();
-                    await gistStorage.sync(data);
-                });
-                
-                const gistId = await config.get('gistId');
-                vscode.window.showInformationMessage(
-                    `Successfully pushed to GitHub Gist${gistId ? ` (ID: ${gistId})` : ''}`,
-                    'Open in Browser'
-                ).then(selection => {
-                    if (selection === 'Open in Browser' && gistId) {
-                        vscode.env.openExternal(vscode.Uri.parse(`https://gist.github.com/${gistId}`));
-                    }
-                });
-            } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to push to GitHub Gist: ${error.message}`);
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.pullFromGist', async () => {
-            try {
-                // Check if GitHub sync is configured
-                const config = vscode.workspace.getConfiguration('snippets');
-                const token = await config.get('githubToken');
-                if (!token) {
-                    const configure = 'Configure GitHub Sync';
-                    const response = await vscode.window.showWarningMessage(
-                        'GitHub sync is not configured. Would you like to configure it now?',
-                        configure
-                    );
-                    if (response === configure) {
-                        await gistStorage.configure();
-                        return;
-                    }
-                    return;
-                }
-
-                // Show progress notification
-                await vscode.window.withProgress({
-                    location: vscode.ProgressLocation.Notification,
-                    title: "Pulling snippets from GitHub Gist...",
-                    cancellable: false
-                }, async () => {
-                    const data = await gistStorage.load();
-                    if (data) {
-                        await localStorage.syncData(data);
-                        treeDataProvider.refresh();
-                    }
-                });
-                
-                vscode.window.showInformationMessage('Successfully pulled snippets from GitHub Gist');
-            } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to pull from GitHub Gist: ${error.message}`);
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.manageGitHubToken', async () => {
-            const config = vscode.workspace.getConfiguration('snippets');
-            const currentToken = await config.get('snippets.githubToken');
-            
-            const items: vscode.QuickPickItem[] = [
-                {
-                    label: "$(key) Update GitHub Token",
-                    description: "Change your GitHub Personal Access Token"
-                },
-                {
-                    label: "$(sync) Test Connection",
-                    description: "Verify your current GitHub token"
-                },
-                {
-                    label: "$(trash) Remove Token",
-                    description: "Delete the stored GitHub token"
-                }
-            ];
-
-            if (!currentToken) {
-                items.unshift({
-                    label: "$(add) Configure GitHub Token",
-                    description: "Set up GitHub synchronization"
-                });
-            }
-
-            const selection = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Manage GitHub Token'
-            });
-
-            if (!selection) {
-                return;
-            }
-
-            switch (selection.label) {
-                case "$(add) Configure GitHub Token":
-                case "$(key) Update GitHub Token":
-                    await gistStorage.configure();
-                    break;
-                    
-                case "$(sync) Test Connection":
-                    try {
-                        await vscode.window.withProgress({
-                            location: vscode.ProgressLocation.Notification,
-                            title: "Testing GitHub connection...",
-                            cancellable: false
-                        }, async () => {
-                            await gistStorage.testConnection();
-                        });
-                        vscode.window.showInformationMessage('GitHub connection successful!');
-                    } catch (error: any) {
-                        vscode.window.showErrorMessage(`GitHub connection failed: ${error.message}`);
-                    }
-                    break;
-                    
-                case "$(trash) Remove Token":
-                    const confirm = await vscode.window.showWarningMessage(
-                        'Are you sure you want to remove your GitHub token? This will disable synchronization.',
-                        'Yes', 'No'
-                    );
-                    if (confirm === 'Yes') {
-                        await vscode.workspace.getConfiguration().update('snippets.githubToken', undefined, true);
-                        await vscode.workspace.getConfiguration().update('snippets.lastGistId', undefined, true);
-                        vscode.window.showInformationMessage('GitHub token has been removed');
-                    }
-                    break;
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.resetGithubConfig', async () => {
-            try {
-                await vscode.workspace.getConfiguration().update('snippets.githubToken', undefined, true);
-                await vscode.workspace.getConfiguration().update('snippets.lastGistId', undefined, true);
-                vscode.window.showInformationMessage('GitHub configuration has been reset. Please configure sync again.');
-            } catch (error: any) {
-                vscode.window.showErrorMessage(`Failed to reset configuration: ${error.message}`);
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.search', async () => {
-            console.log('Snippy Extension: Search command triggered');
-            const query = await vscode.window.showInputBox({
-                placeHolder: 'Search snippets by name or tag...',
-                prompt: 'Enter text to search snippets'
-            });
-            
-            if (query !== undefined) { // User didn't cancel
-                treeDataProvider.setSearchQuery(query);
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.clearSearch', () => {
-            console.log('Snippy Extension: Clear search command triggered');
-            treeDataProvider.setSearchQuery('');
-        }),
-
         vscode.commands.registerCommand('snippets.manageSettings', async () => {
-            const items: vscode.QuickPickItem[] = [
-                {
-                    label: "$(import) Import Snippets",
-                    description: "Import snippets from a JSON file",
-                    detail: "Import your snippets from a backup file"
-                },
-                {
-                    label: "$(export) Export Snippets",
-                    description: "Export snippets to a JSON file",
-                    detail: "Backup your snippets to a file"
-                },
-                {
-                    label: "$(cloud-upload) Push to GitHub Gist",
-                    description: "Upload your snippets to GitHub Gist",
-                    detail: "Sync your snippets to GitHub"
-                },
-                {
-                    label: "$(cloud-download) Pull from GitHub Gist",
-                    description: "Download snippets from GitHub Gist",
-                    detail: "Get your snippets from GitHub"
-                },
-                {
-                    label: "$(key) Manage GitHub Token",
-                    description: "Configure GitHub authentication",
-                    detail: "Set up or update your GitHub access"
-                },
-                {
-                    label: "$(sync-ignored) Reset GitHub Configuration",
-                    description: "Clear GitHub settings",
-                    detail: "Remove GitHub token and settings"
-                },
-                {
-                    label: "$(folder) Configure Backup Folder",
-                    description: "Set automatic backup location",
-                    detail: "Choose where to save snippet backups"
-                }
+            const items = [
+                { label: 'Configure GitHub Token', command: 'snippets.manageGitHubToken' },
+                { label: 'Push to GitHub Gist', command: 'snippets.pushToGist' },
+                { label: 'Pull from GitHub Gist', command: 'snippets.pullFromGist' },
+                { label: 'Configure Backup Folder', command: 'snippets.configureBackupFolder' },
+                { label: 'Sync from Backup Folder', command: 'snippets.syncFromBackupFolder' },
+                { label: 'Import Snippets', command: 'snippets.importSnippets' },
+                { label: 'Export Snippets', command: 'snippets.exportSnippets' },
+                { label: 'Reset GitHub Configuration', command: 'snippets.resetGithubConfig' }
             ];
 
-            const selection = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Snippets Manager Settings',
-                matchOnDescription: true,
-                matchOnDetail: true
+            const selected = await vscode.window.showQuickPick(items, {
+                placeHolder: 'Select a settings option'
             });
 
-            if (!selection) {
-                return;
+            if (selected) {
+                await vscode.commands.executeCommand(selected.command);
             }
+        }),
 
-            switch (selection.label) {
-                case "$(import) Import Snippets":
-                    await vscode.commands.executeCommand('snippets.importSnippets');
-                    break;
-                case "$(export) Export Snippets":
-                    await vscode.commands.executeCommand('snippets.exportSnippets');
-                    break;
-                case "$(cloud-upload) Push to GitHub Gist":
-                    await vscode.commands.executeCommand('snippets.pushToGist');
-                    break;
-                case "$(cloud-download) Pull from GitHub Gist":
-                    await vscode.commands.executeCommand('snippets.pullFromGist');
-                    break;
-                case "$(key) Manage GitHub Token":
-                    await vscode.commands.executeCommand('snippets.manageGitHubToken');
-                    break;
-                case "$(sync-ignored) Reset GitHub Configuration":
-                    await vscode.commands.executeCommand('snippets.resetGithubConfig');
-                    break;
-                case "$(folder) Configure Backup Folder":
-                    await vscode.commands.executeCommand('snippets.configureBackupFolder');
-                    break;
+        vscode.commands.registerCommand('snippets.renameFolder', async (item: SnippetTreeItem) => {
+            const newName = await vscode.window.showInputBox({
+                prompt: 'Enter new folder name',
+                placeHolder: item.label as string,
+                value: item.label as string
+            });
+
+            if (newName) {
+                try {
+                    await localStorage.renameFolder(item.id, newName);
+                    treeDataProvider.refresh();
+                } catch (error) {
+                    vscode.window.showErrorMessage('Failed to rename folder: ' + error);
+                }
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.renameSnippet', async (item: SnippetTreeItem) => {
+            const newName = await vscode.window.showInputBox({
+                prompt: 'Enter new snippet name',
+                placeHolder: item.label as string,
+                value: item.label as string
+            });
+
+            if (newName) {
+                try {
+                    await localStorage.renameSnippet(item.id, newName);
+                    treeDataProvider.refresh();
+                } catch (error) {
+                    vscode.window.showErrorMessage('Failed to rename snippet: ' + error);
+                }
             }
         }),
 
@@ -373,81 +100,466 @@ export function activate(context: vscode.ExtensionContext) {
             language?: string;
             tags?: string[];
         }) => {
-            await localStorage.updateSnippet(update);
-            // Get the full snippet to backup
-            const snippet = await localStorage.getSnippet(update.id);
-            if (snippet) {
-                await BackupManager.backupSnippet(snippet);
+            try {
+                await localStorage.updateSnippet(update);
+                treeDataProvider.refresh();
+            } catch (error) {
+                throw new Error('Failed to update snippet: ' + error);
             }
-            treeDataProvider.refresh();
+        }),
+
+        vscode.commands.registerCommand('snippets.openSnippet', async (snippetInfo: { id: string; name: string; language?: string }) => {
+            try {
+                const snippet = await localStorage.getSnippet(snippetInfo.id);
+                if (snippet) {
+                    await SnippetEditor.show(snippet);
+                } else {
+                    vscode.window.showErrorMessage('Snippet not found');
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to open snippet: ' + error);
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.addFolder', async () => {
+            const name = await vscode.window.showInputBox({
+                prompt: 'Enter folder name',
+                placeHolder: 'My Folder'
+            });
+            if (name) {
+                try {
+                    await localStorage.addFolder(name, null, 'primary' as const);
+                    treeDataProvider.refresh();
+                } catch (error) {
+                    vscode.window.showErrorMessage('Failed to create folder: ' + error);
+                }
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.addSubfolder', async (parentItem: SnippetTreeItem) => {
+            const name = await vscode.window.showInputBox({
+                prompt: 'Enter subfolder name',
+                placeHolder: 'My Subfolder'
+            });
+            if (name) {
+                try {
+                    const folder = await localStorage.addFolder(name, parentItem.id, 'primary' as const);
+                    treeDataProvider.refresh();
+                } catch (error) {
+                    vscode.window.showErrorMessage('Failed to create subfolder: ' + error);
+                }
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.addSnippet', async (parentItem?: SnippetTreeItem) => {
+            if (!parentItem) {
+                vscode.window.showErrorMessage('Please select a folder first');
+                return;
+            }
+            const name = await vscode.window.showInputBox({
+                prompt: 'Enter snippet name',
+                placeHolder: 'My Snippet'
+            });
+            if (name) {
+                try {
+                    await localStorage.addSnippet({
+                        name,
+                        folderId: parentItem.id,
+                        code: '',
+                        language: 'plaintext',
+                        notes: ''
+                    });
+                    treeDataProvider.refresh();
+                } catch (error) {
+                    vscode.window.showErrorMessage('Failed to create snippet: ' + error);
+                }
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.deleteItem', async (item: SnippetTreeItem) => {
+            if (!item) {
+                return;
+            }
+
+            const confirmMessage = item.type === 'folder' 
+                ? 'Are you sure you want to delete this folder and all its snippets?' 
+                : 'Are you sure you want to delete this snippet?';
+
+            const confirmed = await vscode.window.showWarningMessage(
+                confirmMessage,
+                { modal: true },
+                'Delete'
+            );
+
+            if (confirmed === 'Delete') {
+                try {
+                    if (item.type === 'folder') {
+                        await localStorage.deleteFolder(item.id);
+                    } else {
+                        await localStorage.deleteSnippet(item.id);
+                    }
+                    treeDataProvider.refresh();
+                } catch (error) {
+                    vscode.window.showErrorMessage('Failed to delete item: ' + (error as Error).message);
+                }
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.manageGitHubToken', async () => {
+            const token = await vscode.window.showInputBox({
+                prompt: 'Enter your GitHub Personal Access Token',
+                password: true,
+                placeHolder: 'ghp_...',
+                ignoreFocusOut: true
+            });
+
+            if (token) {
+                try {
+                    await vscode.workspace.getConfiguration('snippets').update('githubToken', token, true);
+                    vscode.window.showInformationMessage('GitHub token saved successfully');
+                } catch (error) {
+                    vscode.window.showErrorMessage('Failed to save GitHub token: ' + error);
+                }
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.resetGithubConfig', async () => {
+            try {
+                const config = vscode.workspace.getConfiguration('snippets');
+                await config.update('githubToken', undefined, true);
+                await config.update('gistMapping', {}, true);
+                vscode.window.showInformationMessage('GitHub configuration has been reset');
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to reset GitHub configuration: ' + error);
+            }
         }),
 
         vscode.commands.registerCommand('snippets.configureBackupFolder', async () => {
-            await BackupManager.configureBackupFolder();
+            const currentFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
+            
+            const options: vscode.OpenDialogOptions = {
+                canSelectFiles: false,
+                canSelectFolders: true,
+                canSelectMany: false,
+                defaultUri: currentFolder ? vscode.Uri.file(currentFolder) : undefined,
+                openLabel: 'Select Backup Folder'
+            };
+
+            const result = await vscode.window.showOpenDialog(options);
+            if (result && result[0]) {
+                try {
+                    await vscode.workspace.getConfiguration('snippets').update('backupFolder', result[0].fsPath, true);
+                    vscode.window.showInformationMessage('Backup folder configured successfully');
+                } catch (error) {
+                    vscode.window.showErrorMessage('Failed to configure backup folder: ' + error);
+                }
+            }
         }),
 
         vscode.commands.registerCommand('snippets.importSnippets', async () => {
-            try {
-                // Show file picker for JSON files
-                const uris = await vscode.window.showOpenDialog({
-                    canSelectFiles: true,
-                    canSelectFolders: false,
-                    canSelectMany: false,
-                    filters: {
-                        'JSON files': ['json']
-                    },
-                    title: 'Select Snippets File to Import'
-                });
+            const options: vscode.OpenDialogOptions = {
+                canSelectFiles: true,
+                canSelectFolders: false,
+                canSelectMany: false,
+                filters: {
+                    'JSON files': ['json']
+                },
+                openLabel: 'Import Snippets'
+            };
 
-                if (uris && uris[0]) {
-                    // Read the selected file
-                    const fileContent = await fs.promises.readFile(uris[0].fsPath, 'utf8');
-                    
-                    // Import the data
-                    await localStorage.importData(fileContent);
-                    
-                    // Refresh the tree view
+            const result = await vscode.window.showOpenDialog(options);
+            if (result && result[0]) {
+                try {
+                    const content = await fs.promises.readFile(result[0].fsPath, 'utf8');
+                    const data = JSON.parse(content);
+
+                    console.log('[DEBUG] Import - Parsed file content:', data);
+
+                    let folders: any[] = [];
+                    let snippets: any[] = [];
+
+                    // Handle array format (exported format)
+                    if (Array.isArray(data)) {
+                        data.forEach(item => {
+                            if (item.type === 'folder') {
+                                // Remove the type field as it's not needed in storage
+                                const { type, ...folderData } = item;
+                                folders.push(folderData);
+                            } else if (item.folderId) {
+                                snippets.push(item);
+                            }
+                        });
+                    }
+
+                    console.log('[DEBUG] Import - Processed data:', {
+                        folders: folders.length,
+                        snippets: snippets.length
+                    });
+
+                    // Get current data
+                    const currentData = await localStorage.getAllData();
+
+                    // Merge the data
+                    const mergedFolders = mergeFolders(currentData.folders, folders);
+                    const mergedSnippets = mergeSnippets(currentData.snippets, snippets);
+
+                    console.log('[DEBUG] Import - Final data:', {
+                        folders: mergedFolders.length,
+                        snippets: mergedSnippets.length
+                    });
+
+                    // Sync the merged data
+                    await localStorage.syncData({
+                        folders: mergedFolders,
+                        snippets: mergedSnippets
+                    });
+
                     treeDataProvider.refresh();
-                    
-                    vscode.window.showInformationMessage('Snippets imported successfully!');
+                    vscode.window.showInformationMessage('Snippets imported successfully');
+                } catch (error) {
+                    console.error('[DEBUG] Import error:', error);
+                    vscode.window.showErrorMessage('Failed to import snippets: ' + error);
                 }
-            } catch (error: any) {
-                console.error('Import error:', error);
-                vscode.window.showErrorMessage(`Failed to import snippets: ${error.message}`);
             }
         }),
 
         vscode.commands.registerCommand('snippets.exportSnippets', async () => {
-            try {
-                // Get the export data
-                const exportData = await localStorage.exportData();
-                
-                // Show save file dialog
-                const uri = await vscode.window.showSaveDialog({
-                    filters: {
-                        'JSON files': ['json']
-                    },
-                    title: 'Save Snippets',
-                    saveLabel: 'Export Snippets'
-                });
+            const options: vscode.SaveDialogOptions = {
+                defaultUri: vscode.Uri.file('snippets_export.json'),
+                filters: {
+                    'JSON files': ['json']
+                },
+                saveLabel: 'Export Snippets'
+            };
 
-                if (uri) {
-                    // Write the file
-                    await fs.promises.writeFile(uri.fsPath, exportData);
-                    vscode.window.showInformationMessage('Snippets exported successfully!');
+            const result = await vscode.window.showSaveDialog(options);
+            if (result) {
+                try {
+                    const data = await localStorage.getAllData();
+                    // Convert folders to have type='folder'
+                    const folders = data.folders.map(folder => ({
+                        ...folder,
+                        type: 'folder'
+                    }));
+                    // Combine folders and snippets into a single array
+                    const combinedData = [...folders, ...data.snippets];
+                    await fs.promises.writeFile(result.fsPath, JSON.stringify(combinedData, null, 2));
+                    vscode.window.showInformationMessage('Snippets exported successfully');
+                } catch (error) {
+                    vscode.window.showErrorMessage('Failed to export snippets: ' + error);
                 }
-            } catch (error: any) {
-                console.error('Export error:', error);
-                vscode.window.showErrorMessage(`Failed to export snippets: ${error.message}`);
             }
         }),
 
-        vscode.commands.registerCommand('snippets.getHelp', () => {
-            vscode.env.openExternal(vscode.Uri.parse('http://snippypro.com/'));
-        })
+        vscode.commands.registerCommand('snippets.pushToGist', async () => {
+            try {
+                const token = vscode.workspace.getConfiguration('snippets').get<string>('githubToken');
+                if (!token) {
+                    const result = await vscode.window.showWarningMessage(
+                        'GitHub token not configured. Would you like to configure it now?',
+                        'Yes',
+                        'No'
+                    );
+                    if (result === 'Yes') {
+                        await vscode.commands.executeCommand('snippets.manageGitHubToken');
+                        return;
+                    }
+                    return;
+                }
+
+                await gistStorage.syncToGist();
+                vscode.window.showInformationMessage('Successfully pushed snippets to GitHub Gist');
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to push to GitHub Gist: ' + error);
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.pullFromGist', async () => {
+            try {
+                const token = vscode.workspace.getConfiguration('snippets').get<string>('githubToken');
+                if (!token) {
+                    const result = await vscode.window.showWarningMessage(
+                        'GitHub token not configured. Would you like to configure it now?',
+                        'Yes',
+                        'No'
+                    );
+                    if (result === 'Yes') {
+                        await vscode.commands.executeCommand('snippets.manageGitHubToken');
+                        return;
+                    }
+                    return;
+                }
+
+                await gistStorage.syncFromGist();
+                treeDataProvider.refresh();
+                vscode.window.showInformationMessage('Successfully pulled snippets from GitHub Gist');
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to pull from GitHub Gist: ' + error);
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.search', async () => {
+            const searchQuery = await vscode.window.showInputBox({
+                placeHolder: 'Search snippets...',
+                prompt: 'Enter search term to filter snippets'
+            });
+
+            if (searchQuery !== undefined) {
+                treeDataProvider.setSearchQuery(searchQuery);
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.clearSearch', () => {
+            treeDataProvider.clearSearch();
+        }),
+
+        vscode.commands.registerCommand('snippets.syncFromBackupFolder', async () => {
+            await syncFromBackupFolder(localStorage, treeDataProvider);
+        }),
+
+        treeView
     ];
 
     context.subscriptions.push(...disposables);
+}
 
-    console.log('Snippy Extension: Activation complete');  // Debug log
+async function syncFromBackupFolder(localStorage: LocalStorage, treeDataProvider: SnippetTreeDataProvider): Promise<void> {
+    try {
+        const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
+        console.log('[DEBUG] Attempting to sync from backup folder:', backupFolder);
+        
+        if (!backupFolder) {
+            const result = await vscode.window.showWarningMessage(
+                'Backup folder not configured. Would you like to configure it now?',
+                'Yes',
+                'No'
+            );
+            if (result === 'Yes') {
+                await vscode.commands.executeCommand('snippets.configureBackupFolder');
+                return;
+            }
+            return;
+        }
+
+        // Let user select the JSON file to sync from
+        const options: vscode.OpenDialogOptions = {
+            canSelectFiles: true,
+            canSelectFolders: false,
+            canSelectMany: false,
+            defaultUri: vscode.Uri.file(backupFolder),
+            filters: {
+                'JSON files': ['json']
+            },
+            title: 'Select JSON file to sync from'
+        };
+
+        const fileUri = await vscode.window.showOpenDialog(options);
+        if (!fileUri || fileUri.length === 0) {
+            return;
+        }
+
+        const filePath = fileUri[0].fsPath;
+        console.log('[DEBUG] Selected file:', filePath);
+
+        try {
+            const content = await fs.promises.readFile(filePath, 'utf8');
+            const data = JSON.parse(content);
+
+            console.log('[DEBUG] Parsed file content:', data);
+
+            let folders: any[] = [];
+            let snippets: any[] = [];
+
+            // Handle different possible formats
+            if (Array.isArray(data)) {
+                // Process each item in the array
+                data.forEach(item => {
+                    if (item.type === 'folder') {
+                        folders.push(item);
+                    } else if (item.folderId) {
+                        snippets.push(item);
+                    }
+                });
+            } else if (typeof data === 'object') {
+                // If it's an object with folders and snippets
+                if (data.folders) {
+                    folders = Array.isArray(data.folders) ? data.folders : [];
+                }
+                if (data.snippets) {
+                    snippets = Array.isArray(data.snippets) ? data.snippets : [];
+                }
+            }
+
+            console.log('[DEBUG] Processed data:', {
+                folders: folders.length,
+                snippets: snippets.length
+            });
+
+            // Get current data
+            const currentData = await localStorage.getAllData();
+
+            // Merge the data
+            const mergedFolders = mergeFolders(currentData.folders, folders);
+            const mergedSnippets = mergeSnippets(currentData.snippets, snippets);
+
+            console.log('[DEBUG] Merged data:', {
+                folders: mergedFolders.length,
+                snippets: mergedSnippets.length
+            });
+
+            // Sync the merged data
+            await localStorage.syncData({
+                folders: mergedFolders,
+                snippets: mergedSnippets
+            });
+            
+            treeDataProvider.refresh();
+            vscode.window.showInformationMessage('Successfully synced snippets from selected file');
+        } catch (error) {
+            console.error('[DEBUG] Error reading/parsing file:', error);
+            vscode.window.showErrorMessage('Failed to read or parse the selected file');
+            return;
+        }
+    } catch (error) {
+        console.error('[DEBUG] Sync error:', error);
+        vscode.window.showErrorMessage('Failed to sync from backup folder: ' + error);
+    }
+}
+
+// Helper function to merge folders arrays while preserving unique IDs
+function mergeFolders(existing: any[], newFolders: any[]): any[] {
+    const folderMap = new Map();
+    
+    // Add existing folders to map
+    existing.forEach(folder => {
+        folderMap.set(folder.id, folder);
+    });
+
+    // Merge in new folders, preserving existing ones
+    newFolders.forEach(folder => {
+        if (!folderMap.has(folder.id)) {
+            folderMap.set(folder.id, folder);
+        }
+    });
+
+    return Array.from(folderMap.values());
+}
+
+// Helper function to merge snippets arrays while preserving unique IDs
+function mergeSnippets(existing: any[], newSnippets: any[]): any[] {
+    const snippetMap = new Map();
+    
+    // Add existing snippets to map
+    existing.forEach(snippet => {
+        snippetMap.set(snippet.id, snippet);
+    });
+
+    // Merge in new snippets, preserving existing ones
+    newSnippets.forEach(snippet => {
+        if (!snippetMap.has(snippet.id)) {
+            snippetMap.set(snippet.id, snippet);
+        }
+    });
+
+    return Array.from(snippetMap.values());
 } 

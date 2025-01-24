@@ -1,126 +1,85 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import { Folder, Snippet } from '../storage/types';
 
 export class SnippetTreeItem extends vscode.TreeItem {
+    public readonly draggable: boolean;
+    public readonly dropTarget: boolean;
+
     constructor(
         public readonly label: string,
         public readonly id: string,
-        public readonly collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly type: 'folder' | 'snippet',
+        public readonly parentId: string | null = null,
         public readonly language?: string
     ) {
+        // For folders, use Collapsed state if it has a parentId (subfolder), otherwise Expanded (root folder)
+        const collapsibleState = type === 'folder' 
+            ? (parentId === null ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed)
+            : vscode.TreeItemCollapsibleState.None;
+
         super(label, collapsibleState);
 
-        // Set the contextValue to match the type for menu contributions
+        this.tooltip = type === 'folder' ? `Folder: ${label}` : label;
         this.contextValue = type;
 
-        // Set tooltip
-        this.tooltip = type === 'folder' ? `Folder: ${label}` : label;
+        // Enable drag for snippets and drop for folders
+        this.draggable = type === 'snippet';
+        this.dropTarget = type === 'folder';
 
-        // For snippets, set up the open command
-        if (type === 'snippet') {
+        if (type === 'folder') {
+            // Use different icons for root folders and subfolders
+            this.iconPath = new vscode.ThemeIcon(parentId === null ? 'folder' : 'folder-opened');
+        } else {
+            // Create a fake file path with the correct extension to get proper file icon
+            const extension = this.getLanguageExtension(language || 'plaintext');
+            this.resourceUri = vscode.Uri.parse(`file:///fake/path/file.${extension}`);
+            
+            // Only pass the necessary properties to avoid circular reference
             this.command = {
                 command: 'snippets.openSnippet',
                 title: 'Open Snippet',
-                arguments: [this]
+                arguments: [{
+                    id: this.id,
+                    name: this.label,
+                    type: this.type,
+                    language: this.language
+                }]
             };
         }
+    }
 
-        // Set icon based on type
-        if (type === 'folder') {
-            this.iconPath = new vscode.ThemeIcon('folder');
-        } else {
-            // For snippets, use language-specific file icons
-            if (language) {
-                // Map common language IDs to file extensions
-                const extensionMap: { [key: string]: string } = {
-                    // Web languages
-                    'javascript': '.js',
-                    'typescript': '.ts',
-                    'html': '.html',
-                    'css': '.css',
-                    'scss': '.scss',
-                    'sass': '.sass',
-                    'less': '.less',
-                    'postcss': '.css',
-                    'tailwindcss': '.css',
-                    'json': '.json',
-                    'xml': '.xml',
-                    'yaml': '.yaml',
-                    'markdown': '.md',
-                    
-                    // Programming languages
-                    'python': '.py',
-                    'java': '.java',
-                    'csharp': '.cs',
-                    'cpp': '.cpp',
-                    'c': '.c',
-                    'ruby': '.rb',
-                    'php': '.php',
-                    'go': '.go',
-                    'rust': '.rs',
-                    'swift': '.swift',
-                    'kotlin': '.kt',
-                    'dart': '.dart',
-                    'r': '.r',
-                    'perl': '.pl',
-                    'lua': '.lua',
-                    'scala': '.scala',
-                    
-                    // Shell and scripting
-                    'shell': '.sh',
-                    'bash': '.sh',
-                    'zsh': '.sh',
-                    'powershell': '.ps1',
-                    'batch': '.bat',
-                    
-                    // Database
-                    'sql': '.sql',
-                    'plsql': '.sql',
-                    'mongodb': '.mongodb',
-                    
-                    // Config and build
-                    'dockerfile': 'Dockerfile',
-                    'docker-compose': 'docker-compose.yml',
-                    'makefile': 'Makefile',
-                    'toml': '.toml',
-                    'ini': '.ini',
-                    'env': '.env',
-                    
-                    // Web frameworks
-                    'vue': '.vue',
-                    'react': '.jsx',
-                    'svelte': '.svelte',
-                    'angular': '.ts',
-                    'astro': '.astro',
-                    
-                    // Template languages
-                    'handlebars': '.hbs',
-                    'ejs': '.ejs',
-                    'pug': '.pug',
-                    'nunjucks': '.njk',
-                    
-                    // Other
-                    'regex': '.regex',
-                    'graphql': '.graphql',
-                    'latex': '.tex',
-                    'plaintext': '.txt'
-                };
+    private getLanguageExtension(language: string): string {
+        // Map of languages to their file extensions
+        const extensionMap: { [key: string]: string } = {
+            'javascript': 'js',
+            'typescript': 'ts',
+            'python': 'py',
+            'java': 'java',
+            'csharp': 'cs',
+            'cpp': 'cpp',
+            'c': 'c',
+            'go': 'go',
+            'rust': 'rs',
+            'php': 'php',
+            'ruby': 'rb',
+            'html': 'html',
+            'css': 'css',
+            'scss': 'scss',
+            'sass': 'sass',
+            'less': 'less',
+            'json': 'json',
+            'xml': 'xml',
+            'yaml': 'yml',
+            'markdown': 'md',
+            'shell': 'sh',
+            'bash': 'sh',
+            'powershell': 'ps1',
+            'sql': 'sql',
+            'dockerfile': 'dockerfile',
+            'plaintext': 'txt'
+        };
 
-                // Normalize language ID and handle special cases
-                const normalizedLang = language.toLowerCase().replace(/\s+/g, '');
-                
-                // Handle CSS variants
-                if (normalizedLang.includes('css')) {
-                    this.resourceUri = vscode.Uri.parse('file:///dummy/file.css');
-                } else {
-                    const extension = extensionMap[normalizedLang] || '.txt';
-                    this.resourceUri = vscode.Uri.parse(`file:///dummy/file${extension}`);
-                }
-                
-                this.tooltip = `${label} (${language})`;
-            } else {
-                this.iconPath = new vscode.ThemeIcon('symbol-snippet');
-            }
-        }
+        return extensionMap[language.toLowerCase()] || 'txt';
     }
 } 

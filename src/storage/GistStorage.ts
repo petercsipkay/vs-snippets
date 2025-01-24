@@ -1,25 +1,37 @@
 import * as vscode from 'vscode';
 import axios from 'axios';
-import { Folder } from './types';
-import { Snippet } from './types';
+import { Folder, Snippet, GistData } from './types';
+import { LocalStorage } from './LocalStorage';
 
-interface GistData {
-    folders: Folder[];
-    snippets: Snippet[];
+interface GistFile {
+    content: string;
+    truncated?: boolean;
+    size?: number;
+}
+
+interface GistResponse {
+    files: { [key: string]: GistFile };
+    description: string;
 }
 
 interface SnippetGist {
     id: string;
-    description: string;
-    files: {
-        [key: string]: {
-            content: string;
-        };
-    };
+    name: string;
+    code: string;
+    notes: string;
+    folderId: string;
+    language?: string;
 }
 
 export class GistStorage {
+    private localStorage: LocalStorage;
+    private octokit: any;  // Replace with proper Octokit type if available
     private token: string | null = null;
+    private gistId: string | null = null;
+
+    constructor(localStorage: LocalStorage) {
+        this.localStorage = localStorage;
+    }
 
     async configure(): Promise<void> {
         // Ask for GitHub token if not set
@@ -283,59 +295,23 @@ export class GistStorage {
     }
 
     async load(): Promise<GistData | null> {
+        if (!this.token) {
+            console.log('No GitHub token configured');
+            return null;
+        }
+
         try {
-            console.log('Starting Gist sync process...');
-            
-            // Check token
-            if (!this.token) {
-                const storedToken = await vscode.workspace.getConfiguration().get<string>('snippets.githubToken');
-                if (!storedToken) {
-                    vscode.window.showErrorMessage('No GitHub token configured. Please configure your GitHub token first.');
-                    return null;
-                }
-                console.log('Found stored GitHub token');
-                this.token = storedToken;
-            }
-
-            // Verify token works
-            try {
-                console.log('Verifying GitHub token...');
-                await axios.get('https://api.github.com/user', {
-                    headers: {
-                        'Accept': 'application/vnd.github.v3+json',
-                        'Authorization': `Bearer ${this.token}`,
-                        'X-GitHub-Api-Version': '2022-11-28',
-                        'User-Agent': 'VS-Code-Snippets-Manager'
-                    }
-                });
-                console.log('GitHub token verified successfully');
-            } catch (error: any) {
-                console.error('Token verification failed:', error.response?.data || error);
-                vscode.window.showErrorMessage('GitHub token verification failed. Please reconfigure your token.');
-                return null;
-            }
-
-            // Get gist mappings
-            console.log('Fetching gist mappings...');
+            console.log('Starting to load snippets from GitHub Gists');
             const config = vscode.workspace.getConfiguration('snippets');
-            const gistMapping = await config.get<{ [key: string]: string }>('gistMapping');
-            
-            console.log('Current gist mapping:', gistMapping);
-
-            if (!gistMapping || Object.keys(gistMapping).length === 0) {
-                vscode.window.showInformationMessage('No snippets have been pushed to GitHub yet. Please push some snippets first.');
-                return null;
-            }
-
+            const gistMapping = config.get<Record<string, string>>('gistMapping') || {};
             console.log(`Found ${Object.keys(gistMapping).length} gist mappings`);
+
             const folders = new Map<string, Folder>();
             const snippets: Snippet[] = [];
 
-            // Load each snippet from its Gist
             for (const [snippetId, gistId] of Object.entries(gistMapping)) {
                 try {
-                    console.log(`\nFetching gist ${gistId} for snippet ${snippetId}`);
-                    const response = await axios.get<SnippetGist>(`https://api.github.com/gists/${gistId}`, {
+                    const response = await axios.get<GistResponse>(`https://api.github.com/gists/${gistId}`, {
                         headers: {
                             'Accept': 'application/vnd.github.v3+json',
                             'Authorization': `Bearer ${this.token}`,
@@ -370,7 +346,9 @@ export class GistStorage {
                         if (metadata.folderId && metadata.folder && !folders.has(metadata.folderId)) {
                             folders.set(metadata.folderId, {
                                 id: metadata.folderId,
-                                name: metadata.folder
+                                name: metadata.folder,
+                                type: 'primary',  // Default to primary for imported folders
+                                parentId: null    // Default to root level
                             });
                             console.log(`Added folder: ${metadata.folder}`);
                         }
@@ -385,23 +363,10 @@ export class GistStorage {
                             language: metadata.language || 'plaintext'
                         };
 
-                        console.log('Created snippet:', {
-                            id: snippet.id,
-                            name: snippet.name,
-                            language: snippet.language,
-                            codeLength: snippet.code.length
-                        });
-
                         // Only add valid snippets
                         if (snippet.id && snippet.name && snippet.folderId) {
                             snippets.push(snippet);
                             console.log(`Added snippet: ${snippet.name}`);
-                        } else {
-                            console.log('Invalid snippet data:', {
-                                hasId: !!snippet.id,
-                                hasName: !!snippet.name,
-                                hasFolderId: !!snippet.folderId
-                            });
                         }
                     } catch (parseError) {
                         console.log('Failed to parse JSON, trying legacy format');
@@ -418,7 +383,6 @@ export class GistStorage {
                                     const key = line.substring(2, colonIndex).trim();
                                     const value = line.substring(colonIndex + 1).trim();
                                     metadata.set(key, value);
-                                    console.log(`Parsed metadata: ${key} = ${value}`);
                                 }
                             } else {
                                 codeStartIndex = i;
@@ -433,7 +397,9 @@ export class GistStorage {
                         if (folderId && folderName && !folders.has(folderId)) {
                             folders.set(folderId, {
                                 id: folderId,
-                                name: folderName
+                                name: folderName,
+                                type: 'primary',  // Default to primary for imported folders
+                                parentId: null    // Default to root level
                             });
                             console.log(`Added folder: ${folderName}`);
                         }
@@ -454,21 +420,8 @@ export class GistStorage {
                     }
                 } catch (error: any) {
                     console.error(`Error processing gist ${gistId}:`, error.response?.data || error);
-                    if (error.response?.status === 404) {
-                        console.log('Removing invalid gist mapping for', snippetId);
-                        delete gistMapping[snippetId];
-                        await config.update('gistMapping', gistMapping, true);
-                    }
                     continue;
                 }
-            }
-
-            console.log(`\nSync Summary:`);
-            console.log(`- Loaded ${snippets.length} snippets`);
-            console.log(`- Loaded ${folders.size} folders`);
-            
-            if (snippets.length === 0) {
-                vscode.window.showWarningMessage('No valid snippets were found in your GitHub Gists.');
             }
 
             return {
@@ -477,19 +430,155 @@ export class GistStorage {
             };
         } catch (error: any) {
             console.error('Load error:', error.response?.data || error);
-            const errorMessage = error.response?.data?.message || error.message;
-            console.error('Detailed error:', errorMessage);
+            throw error;
+        }
+    }
+
+    async syncToGist(): Promise<void> {
+        try {
+            const folders = await this.localStorage.getFolders();
+            const snippets = await this.localStorage.getSnippets();
             
-            if (error.response?.status === 401) {
-                vscode.window.showErrorMessage('GitHub token is invalid or expired. Please reconfigure your token.');
-            } else if (error.response?.status === 403) {
-                vscode.window.showErrorMessage('Rate limit exceeded or insufficient permissions. Please check your token has the gist scope.');
-            } else if (error.response?.status === 404) {
-                vscode.window.showErrorMessage('One or more gists not found. They may have been deleted.');
-            } else {
-                vscode.window.showErrorMessage(`Failed to load snippets: ${errorMessage}`);
+            const data: GistData = {
+                folders,
+                snippets
+            };
+
+            await this.pushToGist(data);
+        } catch (error) {
+            console.error('Error syncing to gist:', error);
+            throw error;
+        }
+    }
+
+    async syncFromGist(): Promise<void> {
+        try {
+            const data = await this.pullFromGist();
+            await this.localStorage.syncData(data);
+        } catch (error) {
+            console.error('Error syncing from gist:', error);
+            throw error;
+        }
+    }
+
+    private async pullFromGist(): Promise<GistData> {
+        if (!this.token || !this.gistId) {
+            throw new Error('GitHub token or Gist ID not configured');
+        }
+
+        try {
+            const response = await axios.get<GistResponse>(`https://api.github.com/gists/${this.gistId}`, {
+                headers: {
+                    'Authorization': `token ${this.token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+
+            const gist = response.data;
+            const folders: Folder[] = [];
+            const snippets: Snippet[] = [];
+            const folderMap = new Map<string, Folder>();
+
+            for (const [filename, file] of Object.entries(gist.files)) {
+                const content = file.content;
+                const lines = content.split('\n');
+                let metadata: Record<string, string> = {};
+                let codeStartIndex = -1;
+
+                // Parse metadata
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (line === '```') {
+                        codeStartIndex = i + 1;
+                        break;
+                    }
+                    if (line.includes(':')) {
+                        const [key, value] = line.split(':').map((s: string) => s.trim());
+                        metadata[key.toLowerCase()] = value;
+                    }
+                }
+
+                // Create folder if it doesn't exist
+                if (metadata.folderid && !folderMap.has(metadata.folderid)) {
+                    const folder: Folder = {
+                        id: metadata.folderid,
+                        name: metadata.folder || 'Imported',
+                        type: 'primary',
+                        parentId: null  // Root level folder
+                    };
+                    folderMap.set(folder.id, folder);
+                    folders.push(folder);
+                }
+
+                // Create snippet
+                if (metadata.id && metadata.name && metadata.folderid) {
+                    const snippet: Snippet = {
+                        id: metadata.id,
+                        name: metadata.name,
+                        folderId: metadata.folderid,
+                        language: metadata.language || 'plaintext',
+                        notes: metadata.notes || '',
+                        code: lines.slice(codeStartIndex, -1).join('\n')
+                    };
+                    snippets.push(snippet);
+                }
             }
-            
+
+            return { folders, snippets };
+        } catch (error) {
+            console.error('Error pulling from gist:', error);
+            throw error;
+        }
+    }
+
+    private async pushToGist(data: GistData): Promise<void> {
+        if (!this.token || !this.gistId) {
+            throw new Error('GitHub token or Gist ID not configured');
+        }
+
+        try {
+            const files: { [key: string]: { content: string } } = {};
+
+            // Create a file for each snippet
+            data.snippets.forEach((snippet, index) => {
+                // Find the folder for this snippet
+                const folder = data.folders.find(f => f.id === snippet.folderId);
+                if (!folder) {
+                    console.warn(`Folder not found for snippet ${snippet.id}`);
+                    return;
+                }
+
+                // Create the content with metadata
+                const content = [
+                    `Snippet Name: ${snippet.name}`,
+                    `Folder: ${folder.name}`,
+                    `Folder ID: ${folder.id}`,
+                    `ID: ${snippet.id}`,
+                    `Language: ${snippet.language}`,
+                    snippet.notes ? `Notes: ${snippet.notes}` : '',
+                    '```',
+                    snippet.code,
+                    '```'
+                ].join('\n');
+
+                // Add the file to the gist
+                files[`snippet_${index + 1}.txt`] = { content };
+            });
+
+            // Update the gist
+            await axios.patch(`https://api.github.com/gists/${this.gistId}`, {
+                files,
+                description: 'VS Code Snippets Backup'
+            }, {
+                headers: {
+                    'Authorization': `token ${this.token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+
+            console.log('Successfully pushed snippets to Gist');
+        } catch (error) {
+            console.error('Error pushing to gist:', error);
             throw error;
         }
     }

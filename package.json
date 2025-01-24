@@ -1,8 +1,8 @@
 {
     "name": "snippy-snippets",
-    "displayName": "Snippy Code Snippets Manager",
-    "description": "Snippy Code Snippets Manager for VSCode",
-    "version": "1.0.1",
+    "displayName": "Snippy - Code Snippets Manager",
+    "description": "A powerful code snippets manager for VS Code",
+    "version": "1.0.2",
     "publisher": "Peter Csipkay",
     "icon": "resources/logo.png",
     "repository": {
@@ -24,11 +24,7 @@
         "Programming Languages",
         "Other"
     ],
-    "activationEvents": [
-        "onStartupFinished",
-        "onView:snippetsExplorer",
-        "*"
-    ],
+    "activationEvents": [],
     "main": "./dist/extension.js",
     "contributes": {
         "viewsContainers": {
@@ -44,25 +40,26 @@
             "snippets-explorer": [
                 {
                     "id": "snippetsExplorer",
-                    "name": "Snippy"
+                    "name": "Snippy",
+                    "icon": "resources/snippets.svg"
                 }
             ]
         },
         "menus": {
             "view/title": [
                 {
-                    "command": "snippets.search",
+                    "command": "snippets.addFolder",
                     "when": "view == snippetsExplorer",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "snippets.clearSearch",
+                    "command": "snippets.search",
                     "when": "view == snippetsExplorer",
                     "group": "navigation@2"
                 },
                 {
-                    "command": "snippets.addFolder",
-                    "when": "view == snippetsExplorer",
+                    "command": "snippets.clearSearch",
+                    "when": "view == snippetsExplorer && snippets:hasSearchQuery",
                     "group": "navigation@3"
                 },
                 {
@@ -73,14 +70,19 @@
             ],
             "view/item/context": [
                 {
+                    "command": "snippets.addSubfolder",
+                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "group": "inline@1"
+                },
+                {
                     "command": "snippets.addSnippet",
                     "when": "view == snippetsExplorer && viewItem == folder",
-                    "group": "inline"
+                    "group": "inline@2"
                 },
                 {
                     "command": "snippets.deleteItem",
                     "when": "view == snippetsExplorer && viewItem == folder",
-                    "group": "inline"
+                    "group": "inline@3"
                 },
                 {
                     "command": "snippets.deleteItem",
@@ -96,30 +98,6 @@
                     "command": "snippets.renameSnippet",
                     "when": "view == snippetsExplorer && viewItem == snippet",
                     "group": "1_modification"
-                }
-            ],
-            "commandPalette": [
-                {
-                    "command": "snippets.importSnippets",
-                    "when": "view == snippetsExplorer"
-                },
-                {
-                    "command": "snippets.exportSnippets",
-                    "when": "view == snippetsExplorer"
-                }
-            ],
-            "snippets.settingsMenu": [
-                {
-                    "command": "snippets.importSnippets",
-                    "group": "data@1"
-                },
-                {
-                    "command": "snippets.exportSnippets",
-                    "group": "data@2"
-                },
-                {
-                    "command": "snippets.getHelp",
-                    "group": "help@99"
                 }
             ]
         },
@@ -142,7 +120,7 @@
             {
                 "command": "snippets.addSnippet",
                 "title": "Add Snippet",
-                "icon": "$(add)"
+                "icon": "$(new-file)"
             },
             {
                 "command": "snippets.deleteItem",
@@ -150,8 +128,14 @@
                 "icon": "$(trash)"
             },
             {
-                "command": "snippets.openSnippet",
-                "title": "Open Snippet"
+                "command": "snippets.manageSettings",
+                "title": "Manage Settings",
+                "icon": "$(gear)"
+            },
+            {
+                "command": "snippets.syncFromBackupFolder",
+                "title": "Sync from Backup Folder",
+                "icon": "$(sync)"
             },
             {
                 "command": "snippets.renameFolder",
@@ -162,10 +146,6 @@
                 "command": "snippets.renameSnippet",
                 "title": "Rename Snippet",
                 "icon": "$(edit)"
-            },
-            {
-                "command": "snippets.configureSync",
-                "title": "Configure GitHub Sync"
             },
             {
                 "command": "snippets.pushToGist",
@@ -188,8 +168,7 @@
             },
             {
                 "command": "snippets.configureBackupFolder",
-                "title": "Configure Backup Folder",
-                "icon": "$(folder)"
+                "title": "Configure Backup Folder"
             },
             {
                 "command": "snippets.importSnippets",
@@ -202,14 +181,14 @@
                 "category": "Snippets"
             },
             {
-                "command": "snippets.manageSettings",
-                "title": "Manage Settings",
-                "icon": "$(gear)"
-            },
-            {
                 "command": "snippets.getHelp",
                 "title": "Get Help",
                 "icon": "$(question)"
+            },
+            {
+                "command": "snippets.addSubfolder",
+                "title": "Add Subfolder",
+                "icon": "$(folder-active)"
             }
         ],
         "configuration": {
@@ -231,6 +210,11 @@
                     "default": "",
                     "description": "Folder path where snippet backups will be saved"
                 },
+                "snippets.autoSyncOnStartup": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Automatically sync snippets from backup folder when VS Code starts"
+                },
                 "snippets.storageLocation": {
                     "type": "string",
                     "default": "",
@@ -245,7 +229,7 @@
         "watch": "webpack --watch",
         "package": "webpack --mode production --devtool hidden-source-map",
         "compile-tests": "tsc -p . --outDir out",
-        "watch-tests": "tsc -p . -w --outDir out",
+        "watch-tests": "tsc -p . --outDir out --watch",
         "pretest": "npm run compile-tests && npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
         "test": "node ./out/test/runTest.js"
@@ -253,17 +237,18 @@
     "devDependencies": {
         "@types/node": "^16.18.123",
         "@types/vscode": "^1.87.0",
-        "@typescript-eslint/eslint-plugin": "^6.7.0",
-        "@typescript-eslint/parser": "^6.7.0",
-        "eslint": "^8.49.0",
+        "@typescript-eslint/eslint-plugin": "^6.13.1",
+        "@typescript-eslint/parser": "^6.13.1",
+        "@vscode/test-electron": "^2.3.8",
+        "eslint": "^8.54.0",
         "ts-loader": "^9.5.1",
-        "typescript": "^5.7.3",
-        "webpack": "^5.90.3",
+        "typescript": "^5.3.2",
+        "webpack": "^5.89.0",
         "webpack-cli": "^5.1.4"
     },
     "dependencies": {
         "@types/axios": "^0.9.36",
-        "axios": "^1.7.9",
+        "axios": "^1.6.2",
         "monaco-editor": "^0.52.2"
     }
 }
