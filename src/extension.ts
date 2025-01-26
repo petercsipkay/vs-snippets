@@ -1,16 +1,15 @@
 import * as vscode from 'vscode';
 import { LocalStorage } from './storage/LocalStorage';
-import { GistStorage } from './storage/GistStorage';
+import { SnippetTreeDataProvider } from './sidebar/SnippetTreeDataProvider';
 import { SnippetEditor } from './editor/SnippetEditor';
 import * as fs from 'fs';
 import { SnippetTreeItem } from './sidebar/SnippetTreeItem';
-import { SnippetTreeDataProvider } from './sidebar/SnippetTreeDataProvider';
 import * as path from 'path';
 
 export function activate(context: vscode.ExtensionContext) {
     const localStorage = new LocalStorage();
-    const gistStorage = new GistStorage(localStorage);
     const treeDataProvider = new SnippetTreeDataProvider(localStorage);
+    const snippetEditor = new SnippetEditor();
 
     // Check for auto-sync on startup
     const config = vscode.workspace.getConfiguration('snippets');
@@ -38,20 +37,31 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register commands
     const disposables = [
+        vscode.commands.registerCommand('snippets.search', async () => {
+            const searchQuery = await vscode.window.showInputBox({
+                placeHolder: 'Search snippets...',
+                prompt: 'Enter search term to filter snippets'
+            });
+
+            if (searchQuery !== undefined) {
+                treeDataProvider.setSearchQuery(searchQuery);
+            }
+        }),
+
+        vscode.commands.registerCommand('snippets.clearSearch', () => {
+            treeDataProvider.clearSearch();
+        }),
+
         vscode.commands.registerCommand('snippets.manageSettings', async () => {
             const items = [
-                { label: 'Configure GitHub Token', command: 'snippets.manageGitHubToken' },
-                { label: 'Push to GitHub Gist', command: 'snippets.pushToGist' },
-                { label: 'Pull from GitHub Gist', command: 'snippets.pullFromGist' },
                 { label: 'Configure Backup Folder', command: 'snippets.configureBackupFolder' },
-                { label: 'Sync from Backup Folder', command: 'snippets.syncFromBackupFolder' },
+                { label: 'Sync from Backup Folder', command: 'snippets.syncFromBackup' },
                 { label: 'Import Snippets', command: 'snippets.importSnippets' },
-                { label: 'Export Snippets', command: 'snippets.exportSnippets' },
-                { label: 'Reset GitHub Configuration', command: 'snippets.resetGithubConfig' }
+                { label: 'Export Snippets', command: 'snippets.exportSnippets' }
             ];
 
             const selected = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Select a settings option'
+                placeHolder: 'Select an action'
             });
 
             if (selected) {
@@ -205,35 +215,6 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        vscode.commands.registerCommand('snippets.manageGitHubToken', async () => {
-            const token = await vscode.window.showInputBox({
-                prompt: 'Enter your GitHub Personal Access Token',
-                password: true,
-                placeHolder: 'ghp_...',
-                ignoreFocusOut: true
-            });
-
-            if (token) {
-                try {
-                    await vscode.workspace.getConfiguration('snippets').update('githubToken', token, true);
-                    vscode.window.showInformationMessage('GitHub token saved successfully');
-                } catch (error) {
-                    vscode.window.showErrorMessage('Failed to save GitHub token: ' + error);
-                }
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.resetGithubConfig', async () => {
-            try {
-                const config = vscode.workspace.getConfiguration('snippets');
-                await config.update('githubToken', undefined, true);
-                await config.update('gistMapping', {}, true);
-                vscode.window.showInformationMessage('GitHub configuration has been reset');
-            } catch (error) {
-                vscode.window.showErrorMessage('Failed to reset GitHub configuration: ' + error);
-            }
-        }),
-
         vscode.commands.registerCommand('snippets.configureBackupFolder', async () => {
             const currentFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
             
@@ -351,70 +332,19 @@ export function activate(context: vscode.ExtensionContext) {
             }
         }),
 
-        vscode.commands.registerCommand('snippets.pushToGist', async () => {
-            try {
-                const token = vscode.workspace.getConfiguration('snippets').get<string>('githubToken');
-                if (!token) {
-                    const result = await vscode.window.showWarningMessage(
-                        'GitHub token not configured. Would you like to configure it now?',
-                        'Yes',
-                        'No'
-                    );
-                    if (result === 'Yes') {
-                        await vscode.commands.executeCommand('snippets.manageGitHubToken');
-                        return;
-                    }
-                    return;
-                }
-
-                await gistStorage.syncToGist();
-                vscode.window.showInformationMessage('Successfully pushed snippets to GitHub Gist');
-            } catch (error) {
-                vscode.window.showErrorMessage('Failed to push to GitHub Gist: ' + error);
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.pullFromGist', async () => {
-            try {
-                const token = vscode.workspace.getConfiguration('snippets').get<string>('githubToken');
-                if (!token) {
-                    const result = await vscode.window.showWarningMessage(
-                        'GitHub token not configured. Would you like to configure it now?',
-                        'Yes',
-                        'No'
-                    );
-                    if (result === 'Yes') {
-                        await vscode.commands.executeCommand('snippets.manageGitHubToken');
-                        return;
-                    }
-                    return;
-                }
-
-                await gistStorage.syncFromGist();
-                treeDataProvider.refresh();
-                vscode.window.showInformationMessage('Successfully pulled snippets from GitHub Gist');
-            } catch (error) {
-                vscode.window.showErrorMessage('Failed to pull from GitHub Gist: ' + error);
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.search', async () => {
-            const searchQuery = await vscode.window.showInputBox({
-                placeHolder: 'Search snippets...',
-                prompt: 'Enter search term to filter snippets'
-            });
-
-            if (searchQuery !== undefined) {
-                treeDataProvider.setSearchQuery(searchQuery);
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.clearSearch', () => {
-            treeDataProvider.clearSearch();
-        }),
-
         vscode.commands.registerCommand('snippets.syncFromBackupFolder', async () => {
             await syncFromBackupFolder(localStorage, treeDataProvider);
+        }),
+
+        vscode.commands.registerCommand('snippets.syncFromBackup', async () => {
+            try {
+                const data = await localStorage.getAllData();
+                await localStorage.syncData(data);
+                treeDataProvider.refresh();
+                vscode.window.showInformationMessage('Successfully synced from backup folder');
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to sync from backup folder: ' + error);
+            }
         }),
 
         treeView

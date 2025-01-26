@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 
 export class SnippetEditor {
     private static readonly viewType = 'snippetEditor';
+    private static panels = new Map<string, vscode.WebviewPanel>();
 
     static async show(snippet: { 
         id: string;
@@ -11,7 +12,14 @@ export class SnippetEditor {
         language?: string;
         tags?: string[];
     }) {
-        // Create new panel for each snippet
+        // Check if panel already exists
+        const existingPanel = this.panels.get(snippet.id);
+        if (existingPanel) {
+            existingPanel.reveal();
+            return existingPanel;
+        }
+
+        // Create new panel for the snippet
         const panel = vscode.window.createWebviewPanel(
             this.viewType,
             `Snippet: ${snippet.name}`,
@@ -21,6 +29,14 @@ export class SnippetEditor {
                 retainContextWhenHidden: true
             }
         );
+
+        // Store the panel
+        this.panels.set(snippet.id, panel);
+
+        // Remove from tracking when closed
+        panel.onDidDispose(() => {
+            this.panels.delete(snippet.id);
+        });
 
         panel.webview.html = await this.getWebviewContent(snippet);
 

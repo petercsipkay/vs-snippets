@@ -31,7 +31,7 @@
             "activitybar": [
                 {
                     "id": "snippets-explorer",
-                    "title": "Snippy Snippets Manager",
+                    "title": "Snippy Code Snippets Manager",
                     "icon": "resources/logo.svg"
                 }
             ]
@@ -113,14 +113,24 @@
                 "icon": "$(clear-all)"
             },
             {
+                "command": "snippets.manageSettings",
+                "title": "Manage Settings",
+                "icon": "$(gear)"
+            },
+            {
                 "command": "snippets.addFolder",
                 "title": "Add Folder",
                 "icon": "$(add)"
             },
             {
+                "command": "snippets.addSubfolder",
+                "title": "Add Subfolder",
+                "icon": "$(add)"
+            },
+            {
                 "command": "snippets.addSnippet",
                 "title": "Add Snippet",
-                "icon": "$(new-file)"
+                "icon": "$(add)"
             },
             {
                 "command": "snippets.deleteItem",
@@ -128,12 +138,17 @@
                 "icon": "$(trash)"
             },
             {
-                "command": "snippets.manageSettings",
-                "title": "Manage Settings",
-                "icon": "$(gear)"
+                "command": "snippets.exportSnippets",
+                "title": "Export Snippets",
+                "icon": "$(export)"
             },
             {
-                "command": "snippets.syncFromBackupFolder",
+                "command": "snippets.importSnippets",
+                "title": "Import Snippets",
+                "icon": "$(import)"
+            },
+            {
+                "command": "snippets.syncFromBackup",
                 "title": "Sync from Backup Folder",
                 "icon": "$(sync)"
             },
@@ -148,63 +163,13 @@
                 "icon": "$(edit)"
             },
             {
-                "command": "snippets.pushToGist",
-                "title": "Push to GitHub Gist",
-                "icon": "$(cloud-upload)"
-            },
-            {
-                "command": "snippets.pullFromGist",
-                "title": "Pull from GitHub Gist",
-                "icon": "$(cloud-download)"
-            },
-            {
-                "command": "snippets.manageGitHubToken",
-                "title": "Manage GitHub Token",
-                "icon": "$(key)"
-            },
-            {
-                "command": "snippets.resetGithubConfig",
-                "title": "Reset GitHub Configuration"
-            },
-            {
                 "command": "snippets.configureBackupFolder",
                 "title": "Configure Backup Folder"
-            },
-            {
-                "command": "snippets.importSnippets",
-                "title": "Import Snippets",
-                "category": "Snippets"
-            },
-            {
-                "command": "snippets.exportSnippets",
-                "title": "Export Snippets",
-                "category": "Snippets"
-            },
-            {
-                "command": "snippets.getHelp",
-                "title": "Get Help",
-                "icon": "$(question)"
-            },
-            {
-                "command": "snippets.addSubfolder",
-                "title": "Add Subfolder",
-                "icon": "$(folder-active)"
             }
         ],
         "configuration": {
-            "title": "Code Snippets Manager",
+            "title": "Snippets Manager",
             "properties": {
-                "snippets.githubToken": {
-                    "type": "string",
-                    "description": "GitHub Personal Access Token for Gist synchronization",
-                    "scope": "application"
-                },
-                "snippets.gistMapping": {
-                    "type": "object",
-                    "description": "Mapping of snippet IDs to their corresponding Gist IDs",
-                    "scope": "application",
-                    "default": {}
-                },
                 "snippets.backupFolder": {
                     "type": "string",
                     "default": "",

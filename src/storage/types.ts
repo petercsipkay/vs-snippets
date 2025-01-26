@@ -13,9 +13,4 @@ export interface Snippet {
     language: string;
     notes: string;
     tags?: string[];  // Optional array of tags
-}
-
-export interface GistData {
-    folders: Folder[];
-    snippets: Snippet[];
 } 
