@@ -7,11 +7,53 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
     private _onDidChangeTreeData: vscode.EventEmitter<SnippetTreeItem | undefined> = new vscode.EventEmitter<SnippetTreeItem | undefined>();
     readonly onDidChangeTreeData: vscode.Event<SnippetTreeItem | undefined> = this._onDidChangeTreeData.event;
     private searchQuery: string = '';
+    private folders: Folder[] = [];
+    private snippets: Snippet[] = [];
+    private isLoading: boolean = false;
 
-    constructor(private localStorage: LocalStorage) {}
+    constructor(private localStorage: LocalStorage) {
+        this.loadData().catch(error => {
+            console.error('[DEBUG] Error in initial load:', error);
+        });
+    }
 
-    refresh(): void {
-        this._onDidChangeTreeData.fire(undefined);
+    private async loadData(): Promise<void> {
+        if (this.isLoading) {
+            console.log('[DEBUG] Already loading data, skipping');
+            return;
+        }
+
+        this.isLoading = true;
+        try {
+            console.log('[DEBUG] Loading tree data');
+            const data = await this.localStorage.getAllData();
+            this.folders = data.folders;
+            this.snippets = data.snippets;
+            console.log('[DEBUG] Loaded data:', {
+                folders: this.folders.length,
+                snippets: this.snippets.length,
+                folderIds: this.folders.map(f => f.id),
+                snippetIds: this.snippets.map(s => s.id)
+            });
+        } catch (error) {
+            console.error('[DEBUG] Error loading data:', error);
+            throw error;
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    async refresh(): Promise<void> {
+        console.log('[DEBUG] Starting tree view refresh');
+        try {
+            await this.loadData();
+            console.log('[DEBUG] Data loaded, firing refresh event');
+            this._onDidChangeTreeData.fire(undefined);
+            console.log('[DEBUG] Tree view refresh complete');
+        } catch (error) {
+            console.error('[DEBUG] Error during refresh:', error);
+            throw error;
+        }
     }
 
     setSearchQuery(query: string): void {
@@ -112,13 +154,11 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
         try {
             if (!element) {
                 // Root level - show only root folders
-                const folders = await this.localStorage.getFolders();
-                const rootFolders = folders.filter(folder => folder.parentId === null);
+                const rootFolders = this.folders.filter(folder => folder.parentId === null);
                 
                 // If searching, also show matching snippets at root level
                 if (this.searchQuery) {
-                    const snippets = await this.localStorage.getSnippets();
-                    const matchingSnippets = snippets.filter(snippet => this.snippetMatchesSearch(snippet));
+                    const matchingSnippets = this.snippets.filter(snippet => this.snippetMatchesSearch(snippet));
 
                     return [
                         ...rootFolders
@@ -147,41 +187,29 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
                 ));
             } else if (element.type === 'folder') {
                 // Folder level - show subfolders and snippets
-                const [folders, snippets] = await Promise.all([
-                    this.localStorage.getFolders(),
-                    this.localStorage.getSnippets()
-                ]);
+                const subfolders = this.folders.filter(folder => folder.parentId === element.id);
+                const folderSnippets = this.snippets.filter(snippet => snippet.folderId === element.id);
 
-                // Get subfolders of current folder
-                const subFolders = folders
-                    .filter(folder => folder.parentId === element.id)
-                    .filter(folder => this.folderMatchesSearch(folder))
-                    .map(folder => new SnippetTreeItem(
+                return [
+                    ...subfolders.map(folder => new SnippetTreeItem(
                         folder.name,
                         folder.id,
                         'folder',
                         folder.parentId
-                    ));
-
-                // Get snippets in current folder
-                const folderSnippets = snippets
-                    .filter(snippet => snippet.folderId === element.id)
-                    .filter(snippet => this.snippetMatchesSearch(snippet))
-                    .map(snippet => new SnippetTreeItem(
+                    )),
+                    ...folderSnippets.map(snippet => new SnippetTreeItem(
                         snippet.name,
                         snippet.id,
                         'snippet',
-                        element.id,
+                        snippet.folderId,
                         snippet.language
-                    ));
-
-                // Return subfolders first, then snippets
-                return [...subFolders, ...folderSnippets];
+                    ))
+                ];
             }
 
             return [];
         } catch (error) {
-            console.error('Error getting children:', error);
+            console.error('[DEBUG] Error getting children:', error);
             return [];
         }
     }

@@ -2,8 +2,8 @@
     "name": "snippy-snippets",
     "displayName": "Snippy - Code Snippets Manager",
     "description": "A powerful code snippets manager for VS Code",
-    "version": "1.0.2",
-    "publisher": "Peter Csipkay",
+    "version": "1.0.3",
+    "publisher": "petercsipkay",
     "icon": "resources/logo.png",
     "repository": {
         "type": "git",

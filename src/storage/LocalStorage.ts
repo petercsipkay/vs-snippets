@@ -66,64 +66,161 @@ export class LocalStorage {
     private async getFoldersData(): Promise<Folder[]> {
         await this.waitForInitialization();
         const foldersPath = path.join(this.storagePath, 'folders.json');
+        console.log('[DEBUG] Reading folders from:', foldersPath);
         const data = await fs.promises.readFile(foldersPath, 'utf8');
-        return JSON.parse(data);
+        console.log('[DEBUG] Raw folders data:', data);
+        const folders = JSON.parse(data);
+        console.log('[DEBUG] Parsed folders:', {
+            count: folders.length,
+            folders: folders
+        });
+        return folders;
     }
 
     private async getSnippetsData(): Promise<Snippet[]> {
         await this.waitForInitialization();
         const snippetsPath = path.join(this.storagePath, 'snippets.json');
+        console.log('[DEBUG] Reading snippets from:', snippetsPath);
         const data = await fs.promises.readFile(snippetsPath, 'utf8');
-        return JSON.parse(data);
+        console.log('[DEBUG] Raw snippets data:', data);
+        const snippets = JSON.parse(data);
+        console.log('[DEBUG] Parsed snippets:', {
+            count: snippets.length,
+            snippets: snippets
+        });
+        return snippets;
     }
 
     private async saveFoldersData(folders: Folder[]): Promise<void> {
         await this.waitForInitialization();
+        console.log('[DEBUG] Saving folders to storage:', {
+            count: folders.length,
+            folders: folders
+        });
         const foldersPath = path.join(this.storagePath, 'folders.json');
         await fs.promises.writeFile(foldersPath, JSON.stringify(folders, null, 2));
-
-        // Sync to backup file if configured
-        await this.saveToBackup();
+        console.log('[DEBUG] Folders saved to:', foldersPath);
+        
+        // Verify the file was written correctly
+        try {
+            const savedContent = await fs.promises.readFile(foldersPath, 'utf8');
+            const savedFolders = JSON.parse(savedContent);
+            console.log('[DEBUG] Verified folders file content:', {
+                path: foldersPath,
+                content: savedContent,
+                parsed: savedFolders,
+                count: savedFolders.length
+            });
+        } catch (error) {
+            console.error('[DEBUG] Error verifying folders file:', error);
+        }
     }
 
     private async saveSnippetsData(snippets: Snippet[]): Promise<void> {
         await this.waitForInitialization();
+        console.log('[DEBUG] Saving snippets to storage:', {
+            count: snippets.length,
+            snippets: snippets
+        });
         const snippetsPath = path.join(this.storagePath, 'snippets.json');
         await fs.promises.writeFile(snippetsPath, JSON.stringify(snippets, null, 2));
-
-        // Sync to backup file if configured
-        await this.saveToBackup();
+        console.log('[DEBUG] Snippets saved to:', snippetsPath);
+        
+        // Verify the file was written correctly
+        try {
+            const savedContent = await fs.promises.readFile(snippetsPath, 'utf8');
+            const savedSnippets = JSON.parse(savedContent);
+            console.log('[DEBUG] Verified snippets file content:', {
+                path: snippetsPath,
+                content: savedContent,
+                parsed: savedSnippets,
+                count: savedSnippets.length
+            });
+        } catch (error) {
+            console.error('[DEBUG] Error verifying snippets file:', error);
+        }
     }
 
-    // New helper method to save everything to a single backup file
-    private async saveToBackup(): Promise<void> {
+    // Method to get data from backup file without syncing
+    async getBackupData(): Promise<{ folders: Folder[]; snippets: Snippet[]; timestamp: string } | null> {
         const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
         if (!backupFolder) {
-            return;
+            throw new Error('Backup folder not configured');
         }
 
         try {
-            // Get all current data
-            const data = await this.getAllData();
-            
-            // Convert folders to have type='folder'
-            const folders = data.folders.map(folder => ({
-                ...folder,
-                type: 'folder'
-            }));
-
-            // Combine into a single array
-            const combinedData = [...folders, ...data.snippets];
-
-            // Save to the backup file
             const backupPath = path.join(backupFolder, 'snippets.json');
-            await fs.promises.mkdir(backupFolder, { recursive: true });
-            await fs.promises.writeFile(backupPath, JSON.stringify(combinedData, null, 2));
-            
-            console.log('[DEBUG] Saved to backup file:', backupPath);
+            if (!await this.fileExists(backupPath)) {
+                return null;
+            }
+
+            const backupContent = await fs.promises.readFile(backupPath, 'utf8');
+            const backupData = JSON.parse(backupContent);
+
+            if (!backupData.data || !Array.isArray(backupData.data)) {
+                throw new Error('Invalid backup file format');
+            }
+
+            // Separate into folders and snippets
+            const folders: Folder[] = [];
+            const snippets: Snippet[] = [];
+            backupData.data.forEach((item: any) => {
+                if (item.type === 'folder') {
+                    const { type, ...folderData } = item;
+                    folders.push(folderData);
+                } else {
+                    snippets.push(item);
+                }
+            });
+
+            return {
+                folders,
+                snippets,
+                timestamp: backupData.timestamp
+            };
         } catch (error) {
-            console.error('[DEBUG] Error saving to backup:', error);
+            console.error('[DEBUG] Error reading backup:', error);
+            throw error;
         }
+    }
+
+    // Method to sync from backup file
+    async syncFromBackup(): Promise<void> {
+        const backupData = await this.getBackupData();
+        if (!backupData) {
+            throw new Error('No backup data found');
+        }
+
+        // Get current data
+        const currentData = await this.getAllData();
+        const currentItems = new Map();
+        [...currentData.folders, ...currentData.snippets].forEach(item => {
+            currentItems.set(item.id, item);
+        });
+
+        // Merge with backup data, keeping newer versions
+        const mergedItems = new Map(currentItems);
+        [...backupData.folders, ...backupData.snippets].forEach(item => {
+            const current = currentItems.get(item.id);
+            if (!current || item.lastModified > current.lastModified) {
+                mergedItems.set(item.id, item);
+            }
+        });
+
+        // Separate into folders and snippets
+        const folders: Folder[] = [];
+        const snippets: Snippet[] = [];
+        mergedItems.forEach(item => {
+            if ('type' in item) {
+                const { type, ...folderData } = item;
+                folders.push(folderData as Folder);
+            } else {
+                snippets.push(item as Snippet);
+            }
+        });
+
+        // Save merged data
+        await this.syncData({ folders, snippets });
     }
 
     async getFolders(): Promise<Folder[]> {
@@ -154,25 +251,29 @@ export class LocalStorage {
             id: Date.now().toString(),
             name,
             parentId,
-            type
+            type,
+            lastModified: Date.now()
         };
 
         const folders = await this.getFolders();
         folders.push(newFolder);
         await this.saveFoldersData(folders);
+        await this.updateBackupFile({ folders, snippets: await this.getSnippetsData() });
         return newFolder;
     }
 
-    async addSnippet(snippet: Omit<Snippet, 'id'>): Promise<Snippet> {
+    async addSnippet(snippet: Omit<Snippet, 'id' | 'lastModified'>): Promise<Snippet> {
         await this.waitForInitialization();
         const newSnippet: Snippet = {
             id: Date.now().toString(),
+            lastModified: Date.now(),
             ...snippet
         };
 
         const snippets = await this.getSnippets();
         snippets.push(newSnippet);
         await this.saveSnippetsData(snippets);
+        await this.updateBackupFile({ folders: await this.getFoldersData(), snippets });
         return newSnippet;
     }
 
@@ -188,6 +289,7 @@ export class LocalStorage {
 
         await this.saveFoldersData(updatedFolders);
         await this.saveSnippetsData(updatedSnippets);
+        await this.updateBackupFile({ folders: updatedFolders, snippets: updatedSnippets });
     }
 
     async deleteSnippet(id: string): Promise<void> {
@@ -195,6 +297,7 @@ export class LocalStorage {
         const snippets = await this.getSnippets();
         const updatedSnippets = snippets.filter(snippet => snippet.id !== id);
         await this.saveSnippetsData(updatedSnippets);
+        await this.updateBackupFile({ folders: await this.getFoldersData(), snippets: updatedSnippets });
     }
 
     async updateSnippet(update: SnippetUpdate): Promise<void> {
@@ -204,9 +307,11 @@ export class LocalStorage {
         if (snippetIndex !== -1) {
             snippets[snippetIndex] = {
                 ...snippets[snippetIndex],
-                ...update
+                ...update,
+                lastModified: Date.now()
             };
             await this.saveSnippetsData(snippets);
+            await this.updateBackupFile({ folders: await this.getFoldersData(), snippets });
         }
     }
 
@@ -216,16 +321,97 @@ export class LocalStorage {
     }
 
     async getAllData(): Promise<{ folders: Folder[]; snippets: Snippet[] }> {
-        return {
+        console.log('[DEBUG] Getting all data');
+        const data = {
             folders: await this.getFoldersData(),
             snippets: await this.getSnippetsData()
         };
+        console.log('[DEBUG] Retrieved data:', {
+            folders: data.folders.length,
+            snippets: data.snippets.length,
+            folderDetails: data.folders,
+            snippetDetails: data.snippets
+        });
+        return data;
+    }
+
+    private async updateBackupFile(data: { folders: Folder[]; snippets: Snippet[] }): Promise<void> {
+        const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
+        if (!backupFolder) {
+            console.log('[DEBUG] No backup folder configured, skipping backup update');
+            return;
+        }
+
+        try {
+            // Create backup folder if it doesn't exist
+            await fs.promises.mkdir(backupFolder, { recursive: true });
+            const backupPath = path.join(backupFolder, 'snippets.json');
+            console.log('[DEBUG] Updating backup file at:', backupPath);
+
+            // Convert to backup format - ensure it matches the export format exactly
+            const backupData = {
+                version: "1.0",
+                timestamp: new Date().toISOString(),
+                data: [
+                    ...data.folders.map(folder => ({
+                        id: folder.id,
+                        name: folder.name,
+                        parentId: folder.parentId,
+                        type: 'folder',
+                        lastModified: folder.lastModified || Date.now()
+                    })),
+                    ...data.snippets.map(snippet => ({
+                        id: snippet.id,
+                        name: snippet.name,
+                        folderId: snippet.folderId,
+                        code: snippet.code || '',
+                        language: snippet.language || 'plaintext',
+                        notes: snippet.notes || '',
+                        tags: snippet.tags || [],
+                        lastModified: snippet.lastModified || Date.now()
+                    }))
+                ]
+            };
+
+            // Write to backup file
+            await fs.promises.writeFile(backupPath, JSON.stringify(backupData, null, 2));
+            console.log('[DEBUG] Backup file updated successfully with data:', backupData);
+
+            // Verify the backup was written correctly
+            try {
+                const verifyContent = await fs.promises.readFile(backupPath, 'utf8');
+                const verifyData = JSON.parse(verifyContent);
+                console.log('[DEBUG] Verified backup file content:', {
+                    version: verifyData.version,
+                    timestamp: verifyData.timestamp,
+                    itemCount: verifyData.data.length,
+                    path: backupPath
+                });
+            } catch (verifyError) {
+                console.error('[DEBUG] Error verifying backup file:', verifyError);
+            }
+        } catch (error) {
+            console.error('[DEBUG] Failed to update backup file:', error);
+            // Show error to user since this is important for sync
+            vscode.window.showErrorMessage(`Failed to update backup file: ${error}`);
+        }
     }
 
     async syncData(data: { folders: Folder[]; snippets: Snippet[] }): Promise<void> {
+        console.log('[DEBUG] Starting data sync with:', {
+            folders: data.folders.length,
+            snippets: data.snippets.length,
+            folderDetails: data.folders,
+            snippetDetails: data.snippets
+        });
         await this.waitForInitialization();
         await this.saveFoldersData(data.folders);
         await this.saveSnippetsData(data.snippets);
+        
+        // Update backup file after successful save
+        await this.updateBackupFile(data);
+        
+        console.log('[DEBUG] Data sync completed');
     }
 
     async renameFolder(folderId: string, newName: string): Promise<void> {
@@ -233,8 +419,13 @@ export class LocalStorage {
         const folderIndex = folders.findIndex(f => f.id === folderId);
         
         if (folderIndex !== -1) {
-            folders[folderIndex].name = newName;
+            folders[folderIndex] = {
+                ...folders[folderIndex],
+                name: newName,
+                lastModified: Date.now()
+            };
             await this.saveFoldersData(folders);
+            await this.updateBackupFile({ folders, snippets: await this.getSnippetsData() });
         }
     }
 
@@ -243,8 +434,13 @@ export class LocalStorage {
         const snippetIndex = snippets.findIndex(s => s.id === snippetId);
         
         if (snippetIndex !== -1) {
-            snippets[snippetIndex].name = newName;
+            snippets[snippetIndex] = {
+                ...snippets[snippetIndex],
+                name: newName,
+                lastModified: Date.now()
+            };
             await this.saveSnippetsData(snippets);
+            await this.updateBackupFile({ folders: await this.getFoldersData(), snippets });
         }
     }
 
@@ -257,7 +453,10 @@ export class LocalStorage {
                 data: {
                     folders: data.folders.map(folder => ({
                         id: folder.id,
-                        name: folder.name
+                        name: folder.name,
+                        type: folder.type,
+                        parentId: folder.parentId,
+                        lastModified: folder.lastModified || Date.now()
                     })),
                     snippets: data.snippets.map(snippet => ({
                         id: snippet.id,
@@ -265,7 +464,8 @@ export class LocalStorage {
                         code: snippet.code,
                         notes: snippet.notes || "",
                         folderId: snippet.folderId,
-                        language: snippet.language || "plaintext"
+                        language: snippet.language || "plaintext",
+                        lastModified: snippet.lastModified || Date.now()
                     }))
                 }
             };
@@ -305,8 +505,15 @@ export class LocalStorage {
 
             // Validate each folder has required fields
             folders.forEach((folder: any, index: number) => {
-                if (!folder.id || typeof folder.id !== 'string' || !folder.name || typeof folder.name !== 'string') {
+                if (!folder.id || typeof folder.id !== 'string' || 
+                    !folder.name || typeof folder.name !== 'string' ||
+                    !folder.type || (folder.type !== 'primary' && folder.type !== 'secondary') ||
+                    (folder.parentId !== null && typeof folder.parentId !== 'string')) {
                     throw new Error(`Invalid folder data at index ${index}`);
+                }
+                // Ensure lastModified exists
+                if (!folder.lastModified) {
+                    folder.lastModified = Date.now();
                 }
             });
 
@@ -317,6 +524,10 @@ export class LocalStorage {
                     typeof snippet.code !== 'string' || // code can be empty but must be string
                     !snippet.folderId || typeof snippet.folderId !== 'string') {
                     throw new Error(`Invalid snippet data at index ${index}`);
+                }
+                // Ensure lastModified exists
+                if (!snippet.lastModified) {
+                    snippet.lastModified = Date.now();
                 }
             });
 
@@ -330,17 +541,21 @@ export class LocalStorage {
             
             // Add existing folders
             existingFolders.forEach((folder, id) => {
-                mergedFolders.set(id, folder);
+                mergedFolders.set(id, {
+                    ...folder,
+                    lastModified: folder.lastModified || Date.now()
+                });
             });
 
             // Add/update imported folders
             folders.forEach((folder: Folder) => {
-                mergedFolders.set(folder.id, {
-                    id: folder.id,
-                    name: folder.name,
-                    type: folder.type,
-                    parentId: folder.parentId
-                });
+                const existingFolder = mergedFolders.get(folder.id);
+                if (!existingFolder || (folder.lastModified > existingFolder.lastModified)) {
+                    mergedFolders.set(folder.id, {
+                        ...folder,
+                        lastModified: folder.lastModified
+                    });
+                }
             });
 
             // Merge snippets
@@ -348,19 +563,21 @@ export class LocalStorage {
             
             // Add existing snippets
             existingSnippets.forEach((snippet, id) => {
-                mergedSnippets.set(id, snippet);
+                mergedSnippets.set(id, {
+                    ...snippet,
+                    lastModified: snippet.lastModified || Date.now()
+                });
             });
 
             // Add/update imported snippets
             snippets.forEach((snippet: Snippet) => {
-                mergedSnippets.set(snippet.id, {
-                    id: snippet.id,
-                    name: snippet.name,
-                    code: snippet.code || "",
-                    notes: snippet.notes || "",
-                    folderId: snippet.folderId,
-                    language: snippet.language || "plaintext"
-                });
+                const existingSnippet = mergedSnippets.get(snippet.id);
+                if (!existingSnippet || (snippet.lastModified > existingSnippet.lastModified)) {
+                    mergedSnippets.set(snippet.id, {
+                        ...snippet,
+                        lastModified: snippet.lastModified
+                    });
+                }
             });
 
             // Convert maps back to arrays
