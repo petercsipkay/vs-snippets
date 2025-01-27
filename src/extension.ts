@@ -35,6 +35,57 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // Add automatic sync on startup
+    (async () => {
+        try {
+            const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
+            if (!backupFolder) {
+                console.log('[DEBUG] No backup folder configured, skipping auto-sync');
+                return;
+            }
+
+            const backupPath = path.join(backupFolder, 'snippets.json');
+            if (!await fileExists(backupPath)) {
+                console.log('[DEBUG] No backup file found at:', backupPath);
+                return;
+            }
+
+            // Read and parse the backup file
+            const content = await fs.promises.readFile(backupPath, 'utf8');
+            const importedData = JSON.parse(content);
+
+            if (importedData.version === "1.0" && Array.isArray(importedData.data)) {
+                let folders: any[] = [];
+                let snippets: any[] = [];
+
+                importedData.data.forEach((item: any) => {
+                    if (item.type === 'folder') {
+                        const { type, ...folderData } = item;
+                        folders.push(folderData);
+                    } else {
+                        snippets.push(item);
+                    }
+                });
+
+                // Show sync status
+                const syncMessage = await vscode.window.showInformationMessage(
+                    `Found ${folders.length} folders and ${snippets.length} snippets in backup. Would you like to sync?`,
+                    'Yes',
+                    'No'
+                );
+
+                if (syncMessage === 'Yes') {
+                    await localStorage.syncData({ folders, snippets });
+                    await treeDataProvider.refresh();
+                    vscode.window.showInformationMessage('Successfully synced snippets from backup');
+                }
+            }
+        } catch (error) {
+            console.error('[DEBUG] Auto-sync error:', error);
+            vscode.window.showErrorMessage('Failed to auto-sync from backup: ' + error);
+        }
+    })();
+
     // Register commands
     const disposables = [
         vscode.commands.registerCommand('snippets.search', async () => {
@@ -622,4 +673,14 @@ function mergeSnippets(existing: any[], newSnippets: any[]): any[] {
     });
 
     return Array.from(snippetMap.values());
+}
+
+// Helper function to check if file exists
+async function fileExists(filePath: string): Promise<boolean> {
+    try {
+        await fs.promises.access(filePath);
+        return true;
+    } catch {
+        return false;
+    }
 } 

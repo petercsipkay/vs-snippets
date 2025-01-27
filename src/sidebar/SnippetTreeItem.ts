@@ -52,8 +52,31 @@ export class SnippetTreeItem extends vscode.TreeItem {
     private getLanguageExtension(language: string): string {
         // Map of languages to their file extensions
         const extensionMap: { [key: string]: string } = {
+            // Web Development
             'javascript': 'js',
             'typescript': 'ts',
+            'jsx': 'jsx',
+            'tsx': 'tsx',
+            'html': 'html',
+            'css': 'css',
+            'scss': 'scss',
+            'sass': 'sass',
+            'less': 'less',
+            'postcss': 'pcss',
+            'tailwindcss': 'css',
+
+            // Web Frameworks
+            'react': 'jsx',
+            'reactts': 'tsx',
+            'vue': 'vue',
+            'svelte': 'svelte',
+            'angular': 'ts',
+            'astro': 'astro',
+            'solid': 'jsx',
+            'nextjs': 'tsx',
+            'nuxt': 'vue',
+
+            // Programming Languages
             'python': 'py',
             'java': 'java',
             'csharp': 'cs',
@@ -63,23 +86,58 @@ export class SnippetTreeItem extends vscode.TreeItem {
             'rust': 'rs',
             'php': 'php',
             'ruby': 'rb',
-            'html': 'html',
-            'css': 'css',
-            'scss': 'scss',
-            'sass': 'sass',
-            'less': 'less',
+            'kotlin': 'kt',
+            'swift': 'swift',
+            'dart': 'dart',
+            'r': 'r',
+            'perl': 'pl',
+            'lua': 'lua',
+            'scala': 'scala',
+
+            // Data & Config
             'json': 'json',
             'xml': 'xml',
             'yaml': 'yml',
+            'toml': 'toml',
+            'ini': 'ini',
+            'env': 'env',
+            'graphql': 'graphql',
             'markdown': 'md',
+            'latex': 'tex',
+
+            // Shell & Scripting
             'shell': 'sh',
             'bash': 'sh',
             'powershell': 'ps1',
+            'batch': 'bat',
+
+            // Database
             'sql': 'sql',
+            'plsql': 'sql',
+            'mongodb': 'mongodb',
+
+            // Build Tools
             'dockerfile': 'dockerfile',
+            'docker-compose': 'yml',
+            'makefile': 'mk',
+            'cmake': 'cmake',
+            'gradle': 'gradle',
+            'webpack': 'js',
+            'rollup': 'js',
+            'vite': 'js',
+
+            // Default
             'plaintext': 'txt'
         };
 
-        return extensionMap[language.toLowerCase()] || 'txt';
+        // Convert language to lowercase for case-insensitive matching
+        const lang = language.toLowerCase();
+
+        // Special handling for React/TypeScript combinations
+        if (lang === 'react' && language.includes('TypeScript')) {
+            return 'tsx';
+        }
+
+        return extensionMap[lang] || 'txt';
     }
 } 

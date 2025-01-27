@@ -125,12 +125,12 @@
             {
                 "command": "snippets.addSubfolder",
                 "title": "Add Subfolder",
-                "icon": "$(add)"
+                "icon": "$(folder-active)"
             },
             {
                 "command": "snippets.addSnippet",
                 "title": "Add Snippet",
-                "icon": "$(add)"
+                "icon": "$(new-file)"
             },
             {
                 "command": "snippets.deleteItem",
