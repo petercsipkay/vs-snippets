@@ -67,18 +67,13 @@ export function activate(context: vscode.ExtensionContext) {
                     }
                 });
 
-                // Show sync status
-                const syncMessage = await vscode.window.showInformationMessage(
-                    `Found ${folders.length} folders and ${snippets.length} snippets in backup. Would you like to sync?`,
-                    'Yes',
-                    'No'
-                );
-
-                if (syncMessage === 'Yes') {
-                    await localStorage.syncData({ folders, snippets });
-                    await treeDataProvider.refresh();
-                    vscode.window.showInformationMessage('Successfully synced snippets from backup');
-                }
+                // Automatically sync without prompting
+                await localStorage.syncData({ folders, snippets });
+                await treeDataProvider.refresh();
+                console.log('[DEBUG] Auto-sync completed successfully:', {
+                    folders: folders.length,
+                    snippets: snippets.length
+                });
             }
         } catch (error) {
             console.error('[DEBUG] Auto-sync error:', error);

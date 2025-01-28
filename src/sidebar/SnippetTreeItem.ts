@@ -28,8 +28,9 @@ export class SnippetTreeItem extends vscode.TreeItem {
         this.dropTarget = type === 'folder';
 
         if (type === 'folder') {
-            // Use different icons for root folders and subfolders
-            this.iconPath = new vscode.ThemeIcon(parentId === null ? 'folder' : 'folder-opened');
+            // Use VS Code's native folder icons
+            this.resourceUri = vscode.Uri.parse(`file:///fake/path/${label}`);
+            this.iconPath = new vscode.ThemeIcon('folder');
         } else {
             // Create a fake file path with the correct extension to get proper file icon
             const extension = this.getLanguageExtension(language || 'plaintext');

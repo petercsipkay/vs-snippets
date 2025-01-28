@@ -183,17 +183,20 @@
                 "snippets.backupFolder": {
                     "type": "string",
                     "default": "",
-                    "description": "Folder path where snippet backups will be saved"
+                    "description": "Folder path where snippet backups will be saved",
+                    "scope": "application"
                 },
                 "snippets.autoSyncOnStartup": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Automatically sync snippets from backup folder when VS Code starts"
+                    "description": "Automatically sync snippets from backup folder when VS Code starts",
+                    "scope": "application"
                 },
                 "snippets.storageLocation": {
                     "type": "string",
                     "default": "",
-                    "description": "Directory where snippets and their data will be stored"
+                    "description": "Directory where snippets and their data will be stored",
+                    "scope": "application"
                 }
             }
         }
