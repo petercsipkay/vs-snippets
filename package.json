@@ -90,6 +90,16 @@
                     "group": "inline"
                 },
                 {
+                    "command": "snippets.addSubfolder",
+                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "group": "1_creation@1"
+                },
+                {
+                    "command": "snippets.addSnippet",
+                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "group": "1_creation@2"
+                },
+                {
                     "command": "snippets.renameFolder",
                     "when": "view == snippetsExplorer && viewItem == folder",
                     "group": "1_modification"
@@ -125,7 +135,7 @@
             {
                 "command": "snippets.addSubfolder",
                 "title": "Add Subfolder",
-                "icon": "$(folder-active)"
+                "icon": "$(new-folder)"
             },
             {
                 "command": "snippets.addSnippet",

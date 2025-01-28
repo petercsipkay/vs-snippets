@@ -13,9 +13,9 @@ export class SnippetTreeItem extends vscode.TreeItem {
         public readonly parentId: string | null = null,
         public readonly language?: string
     ) {
-        // For folders, use Collapsed state if it has a parentId (subfolder), otherwise Expanded (root folder)
+        // Always use Collapsed state for folders
         const collapsibleState = type === 'folder' 
-            ? (parentId === null ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed)
+            ? vscode.TreeItemCollapsibleState.Collapsed
             : vscode.TreeItemCollapsibleState.None;
 
         super(label, collapsibleState);
