@@ -11,6 +11,13 @@ export function activate(context: vscode.ExtensionContext) {
     const treeDataProvider = new SnippetTreeDataProvider(localStorage);
     const snippetEditor = new SnippetEditor();
 
+    // Add disposables to context
+    context.subscriptions.push(
+        localStorage,
+        treeDataProvider,
+        snippetEditor
+    );
+
     // Check for auto-sync on startup
     const config = vscode.workspace.getConfiguration('snippets');
     if (config.get<boolean>('autoSyncOnStartup')) {
@@ -506,6 +513,11 @@ export function activate(context: vscode.ExtensionContext) {
     ];
 
     context.subscriptions.push(...disposables);
+}
+
+export function deactivate() {
+    // Clean up any remaining panels
+    SnippetEditor.disposeAll();
 }
 
 async function syncFromBackupFolder(localStorage: LocalStorage, treeDataProvider: SnippetTreeDataProvider): Promise<void> {

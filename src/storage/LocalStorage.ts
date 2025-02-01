@@ -16,12 +16,20 @@ interface SnippetUpdate {
 export class LocalStorage {
     private initialized: boolean = false;
     private storagePath: string;
+    private disposables: vscode.Disposable[] = [];
 
     constructor() {
         this.storagePath = path.join(os.homedir(), '.vscode', 'snippets');
         this.initializeStorage().catch(error => {
             console.error('Failed to initialize storage:', error);
         });
+    }
+
+    dispose() {
+        // Clean up any disposables
+        this.disposables.forEach(d => d.dispose());
+        this.disposables = [];
+        this.initialized = false;
     }
 
     private async initializeStorage(): Promise<void> {
@@ -81,14 +89,35 @@ export class LocalStorage {
         await this.waitForInitialization();
         const snippetsPath = path.join(this.storagePath, 'snippets.json');
         console.log('[DEBUG] Reading snippets from:', snippetsPath);
-        const data = await fs.promises.readFile(snippetsPath, 'utf8');
-        console.log('[DEBUG] Raw snippets data:', data);
-        const snippets = JSON.parse(data);
-        console.log('[DEBUG] Parsed snippets:', {
-            count: snippets.length,
-            snippets: snippets
-        });
-        return snippets;
+
+        try {
+            const data = await fs.promises.readFile(snippetsPath, 'utf8');
+            console.log('[DEBUG] Raw snippets data:', data);
+
+            const parsedSnippets = JSON.parse(data);
+            
+            // Ensure all snippets have the required fields with proper defaults
+            const sanitizedSnippets = parsedSnippets.map((snippet: any) => ({
+                id: snippet.id,
+                name: snippet.name,
+                folderId: snippet.folderId,
+                code: snippet.code || '',
+                language: snippet.language || 'plaintext',
+                notes: snippet.notes || '',
+                tags: Array.isArray(snippet.tags) ? snippet.tags : [],
+                lastModified: snippet.lastModified || Date.now()
+            }));
+
+            console.log('[DEBUG] Parsed and sanitized snippets:', {
+                count: sanitizedSnippets.length,
+                snippets: sanitizedSnippets
+            });
+
+            return sanitizedSnippets;
+        } catch (error) {
+            console.error('[DEBUG] Error reading snippets:', error);
+            throw error;
+        }
     }
 
     private async saveFoldersData(folders: Folder[]): Promise<void> {
@@ -122,8 +151,28 @@ export class LocalStorage {
             count: snippets.length,
             snippets: snippets
         });
+
+        // Ensure all snippets have the required fields with proper defaults
+        const sanitizedSnippets = snippets.map(snippet => ({
+            id: snippet.id,
+            name: snippet.name,
+            folderId: snippet.folderId,
+            code: snippet.code || '',
+            language: snippet.language || 'plaintext',
+            notes: snippet.notes || '',
+            tags: Array.isArray(snippet.tags) ? snippet.tags : [],
+            lastModified: snippet.lastModified || Date.now()
+        }));
+
         const snippetsPath = path.join(this.storagePath, 'snippets.json');
-        await fs.promises.writeFile(snippetsPath, JSON.stringify(snippets, null, 2));
+        const snippetsJson = JSON.stringify(sanitizedSnippets, null, 2);
+        
+        console.log('[DEBUG] Writing snippets to file:', {
+            path: snippetsPath,
+            content: snippetsJson
+        });
+
+        await fs.promises.writeFile(snippetsPath, snippetsJson);
         console.log('[DEBUG] Snippets saved to:', snippetsPath);
         
         // Verify the file was written correctly
@@ -138,6 +187,7 @@ export class LocalStorage {
             });
         } catch (error) {
             console.error('[DEBUG] Error verifying snippets file:', error);
+            throw error;
         }
     }
 
@@ -264,16 +314,35 @@ export class LocalStorage {
 
     async addSnippet(snippet: Omit<Snippet, 'id' | 'lastModified'>): Promise<Snippet> {
         await this.waitForInitialization();
+        console.log('[DEBUG] Adding new snippet:', snippet);
+
+        // Create a properly structured new snippet
         const newSnippet: Snippet = {
             id: Date.now().toString(),
-            lastModified: Date.now(),
-            ...snippet
+            name: snippet.name,
+            folderId: snippet.folderId,
+            code: snippet.code || '',
+            language: snippet.language || 'plaintext',
+            notes: snippet.notes || '',
+            tags: snippet.tags || [],
+            lastModified: Date.now()
         };
+
+        console.log('[DEBUG] Created new snippet object:', newSnippet);
 
         const snippets = await this.getSnippets();
         snippets.push(newSnippet);
+
+        // Save the updated snippets array
         await this.saveSnippetsData(snippets);
-        await this.updateBackupFile({ folders: await this.getFoldersData(), snippets });
+        
+        // Update the backup file
+        await this.updateBackupFile({ 
+            folders: await this.getFoldersData(), 
+            snippets 
+        });
+
+        console.log('[DEBUG] Snippet added successfully');
         return newSnippet;
     }
 
@@ -301,17 +370,42 @@ export class LocalStorage {
     }
 
     async updateSnippet(update: SnippetUpdate): Promise<void> {
+        console.log('[DEBUG] Updating snippet:', update);
         const snippets = await this.getSnippetsData();
         const snippetIndex = snippets.findIndex(s => s.id === update.id);
         
         if (snippetIndex !== -1) {
-            snippets[snippetIndex] = {
-                ...snippets[snippetIndex],
-                ...update,
+            // Create a new snippet object with the updates
+            const currentSnippet = snippets[snippetIndex];
+            const updatedSnippet = {
+                ...currentSnippet,
+                code: update.code !== undefined ? update.code : currentSnippet.code,
+                notes: update.notes !== undefined ? update.notes : currentSnippet.notes,
+                language: update.language !== undefined ? update.language : currentSnippet.language,
+                tags: update.tags !== undefined ? update.tags : currentSnippet.tags,
+                folderId: update.folderId !== undefined ? update.folderId : currentSnippet.folderId,
                 lastModified: Date.now()
             };
+
+            console.log('[DEBUG] Current snippet:', currentSnippet);
+            console.log('[DEBUG] Updated snippet:', updatedSnippet);
+
+            // Replace the old snippet with the updated one
+            snippets[snippetIndex] = updatedSnippet;
+
+            // Save the updated snippets array
             await this.saveSnippetsData(snippets);
-            await this.updateBackupFile({ folders: await this.getFoldersData(), snippets });
+            
+            // Update the backup file
+            await this.updateBackupFile({ 
+                folders: await this.getFoldersData(), 
+                snippets 
+            });
+
+            console.log('[DEBUG] Snippet updated successfully');
+        } else {
+            console.error('[DEBUG] Snippet not found:', update.id);
+            throw new Error('Snippet not found');
         }
     }
 

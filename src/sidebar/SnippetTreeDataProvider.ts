@@ -17,6 +17,10 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
         });
     }
 
+    dispose() {
+        this._onDidChangeTreeData.dispose();
+    }
+
     private async loadData(): Promise<void> {
         if (this.isLoading) {
             console.log('[DEBUG] Already loading data, skipping');

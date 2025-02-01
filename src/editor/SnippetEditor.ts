@@ -3,6 +3,20 @@ import * as vscode from 'vscode';
 export class SnippetEditor {
     private static readonly viewType = 'snippetEditor';
     private static panels = new Map<string, vscode.WebviewPanel>();
+    private disposables: vscode.Disposable[] = [];
+
+    constructor() {
+        // Initialize any disposables if needed
+    }
+
+    dispose() {
+        // Clean up any instance-specific disposables
+        this.disposables.forEach(d => d.dispose());
+        this.disposables = [];
+        
+        // Clean up all panels
+        SnippetEditor.disposeAll();
+    }
 
     static async show(snippet: { 
         id: string;
@@ -19,16 +33,28 @@ export class SnippetEditor {
             return existingPanel;
         }
 
+        // Get extension URI for icons
+        const extensionUri = vscode.extensions.getExtension('petercsipkay.code-snippets-manager-snippy')?.extensionUri;
+        if (!extensionUri) {
+            throw new Error('Could not find extension URI');
+        }
+
         // Create new panel for the snippet
         const panel = vscode.window.createWebviewPanel(
             this.viewType,
-            `Snippet: ${snippet.name}`,
+            snippet.name,
             vscode.ViewColumn.One,
             {
                 enableScripts: true,
                 retainContextWhenHidden: true
             }
         );
+
+        // Set the icon path
+        panel.iconPath = {
+            light: vscode.Uri.joinPath(extensionUri, 'media', 'snippy-light.svg'),
+            dark: vscode.Uri.joinPath(extensionUri, 'media', 'snippy-dark.svg')
+        };
 
         // Store the panel
         this.panels.set(snippet.id, panel);
@@ -42,21 +68,32 @@ export class SnippetEditor {
 
         // Handle messages from the webview
         panel.webview.onDidReceiveMessage(async message => {
-            switch (message.command) {
-                case 'save':
-                    try {
-                        await vscode.commands.executeCommand('snippets.updateSnippet', {
-                            id: snippet.id,
-                            code: message.code,
-                            notes: message.notes,
-                            language: message.language,
-                            tags: Array.from(message.tags)
-                        });
-                        vscode.window.showInformationMessage('Snippet saved successfully');
-                    } catch (error: any) {
-                        vscode.window.showErrorMessage('Failed to save snippet: ' + (error.message || 'Unknown error'));
-                    }
-                    break;
+            console.log('[DEBUG] Received message from webview:', message);
+            
+            if (message.command === 'save') {
+                try {
+                    console.log('[DEBUG] Saving snippet with data:', {
+                        id: snippet.id,
+                        code: message.code,
+                        notes: message.notes,
+                        language: message.language,
+                        tags: message.tags
+                    });
+
+                    await vscode.commands.executeCommand('snippets.updateSnippet', {
+                        id: snippet.id,
+                        code: message.code,
+                        notes: message.notes,
+                        language: message.language,
+                        tags: Array.isArray(message.tags) ? message.tags : []
+                    });
+
+                    console.log('[DEBUG] Snippet saved successfully');
+                    vscode.window.showInformationMessage('Snippet saved successfully');
+                } catch (error: any) {
+                    console.error('[DEBUG] Error saving snippet:', error);
+                    vscode.window.showErrorMessage('Failed to save snippet: ' + (error.message || 'Unknown error'));
+                }
             }
         });
 
@@ -140,6 +177,232 @@ export class SnippetEditor {
             { label: 'Plain Text', value: 'plaintext' }
         ];
 
+        // Create a data URI with the code content
+        const codeDataUri = `data:text/plain;base64,${Buffer.from(snippet.code).toString('base64')}`;
+
+        const editorScript = `
+            const vscode = acquireVsCodeApi();
+            let currentTags = new Set(${JSON.stringify(snippet.tags || [])});
+            let editor;
+
+            require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
+            require(['vs/editor/editor.main'], async function() {
+                monaco.editor.defineTheme('vscode-dark', {
+                    base: 'vs-dark',
+                    inherit: true,
+                    rules: [],
+                    colors: {
+                        'editor.background': getComputedStyle(document.body).getPropertyValue('--vscode-editor-background'),
+                        'editor.foreground': getComputedStyle(document.body).getPropertyValue('--vscode-editor-foreground')
+                    }
+                });
+
+                monaco.editor.setTheme('vscode-dark');
+
+                const language = ${JSON.stringify(snippet.language || 'plaintext')};
+                let editorLanguage = language;
+                
+                switch (language) {
+                    case 'javascriptreact':
+                        editorLanguage = 'javascript';
+                        monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+                            jsx: monaco.languages.typescript.JsxEmit.React,
+                            allowNonTsExtensions: true,
+                            allowJs: true,
+                            target: monaco.languages.typescript.ScriptTarget.Latest
+                        });
+                        break;
+                    case 'typescriptreact':
+                        editorLanguage = 'typescript';
+                        monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+                            jsx: monaco.languages.typescript.JsxEmit.React,
+                            allowNonTsExtensions: true,
+                            target: monaco.languages.typescript.ScriptTarget.Latest
+                        });
+                        break;
+                    case 'vue':
+                    case 'nuxt':
+                        editorLanguage = 'html';
+                        monaco.languages.html.htmlDefaults.setOptions({
+                            format: {
+                                templating: true,
+                                unformatted: ['script', 'style'],
+                                contentUnformatted: ['pre', 'code', 'textarea']
+                            },
+                            suggest: {
+                                html5: true
+                            }
+                        });
+                        break;
+                    case 'svelte':
+                        editorLanguage = 'html';
+                        monaco.languages.html.htmlDefaults.setOptions({
+                            format: {
+                                templating: true,
+                                unformatted: ['script', 'style'],
+                                contentUnformatted: ['pre', 'code', 'textarea']
+                            }
+                        });
+                        break;
+                    case 'astro':
+                        editorLanguage = 'html';
+                        monaco.languages.html.htmlDefaults.setOptions({
+                            format: {
+                                templating: true
+                            }
+                        });
+                        break;
+                }
+
+                // Fetch the code content from the data URI
+                const response = await fetch('${codeDataUri}');
+                const code = await response.text();
+
+                // Create editor with the fetched code
+                const editorOptions = {
+                    value: code,
+                    language: editorLanguage,
+                    theme: 'vscode-dark',
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    fontSize: parseInt(getComputedStyle(document.body).getPropertyValue('--vscode-editor-font-size')) || 14,
+                    fontFamily: getComputedStyle(document.body).getPropertyValue('--vscode-editor-font-family'),
+                    automaticLayout: true,
+                    padding: { top: 10, bottom: 10 }
+                };
+
+                editor = monaco.editor.create(document.getElementById('editor'), editorOptions);
+
+                // Handle language change
+                document.getElementById('language').addEventListener('change', function() {
+                    const newLanguage = this.value || 'plaintext';
+                    let editorLang = newLanguage;
+                    
+                    switch (newLanguage) {
+                        case 'javascriptreact':
+                            editorLang = 'javascript';
+                            monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+                                jsx: monaco.languages.typescript.JsxEmit.React,
+                                allowNonTsExtensions: true,
+                                allowJs: true,
+                                target: monaco.languages.typescript.ScriptTarget.Latest
+                            });
+                            break;
+                        case 'typescriptreact':
+                            editorLang = 'typescript';
+                            monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+                                jsx: monaco.languages.typescript.JsxEmit.React,
+                                allowNonTsExtensions: true,
+                                target: monaco.languages.typescript.ScriptTarget.Latest
+                            });
+                            break;
+                        case 'vue':
+                        case 'nuxt':
+                            editorLang = 'html';
+                            monaco.languages.html.htmlDefaults.setOptions({
+                                format: {
+                                    templating: true,
+                                    unformatted: ['script', 'style'],
+                                    contentUnformatted: ['pre', 'code', 'textarea']
+                                },
+                                suggest: {
+                                    html5: true
+                                }
+                            });
+                            break;
+                        case 'svelte':
+                            editorLang = 'html';
+                            monaco.languages.html.htmlDefaults.setOptions({
+                                format: {
+                                    templating: true,
+                                    unformatted: ['script', 'style'],
+                                    contentUnformatted: ['pre', 'code', 'textarea']
+                                }
+                            });
+                            break;
+                        case 'astro':
+                            editorLang = 'html';
+                            monaco.languages.html.htmlDefaults.setOptions({
+                                format: {
+                                    templating: true
+                                }
+                            });
+                            break;
+                    }
+                    
+                    monaco.editor.setModelLanguage(editor.getModel(), editorLang);
+                    handleChange();
+                });
+
+                // Handle tag input
+                const tagInput = document.getElementById('tag-input');
+                const tagContainer = document.getElementById('tag-container');
+
+                tagInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const tag = this.value.trim();
+                        if (tag && !currentTags.has(tag)) {
+                            currentTags.add(tag);
+                            const tagElement = document.createElement('span');
+                            tagElement.className = 'tag';
+                            tagElement.dataset.tag = tag;
+                            tagElement.innerHTML = tag + '<span class="tag-remove">&times;</span>';
+                            tagContainer.appendChild(tagElement);
+                            this.value = '';
+                            handleChange();
+                        }
+                    }
+                });
+
+                // Handle tag removal
+                tagContainer.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('tag-remove')) {
+                        const tag = e.target.parentElement;
+                        if (tag && tag.dataset.tag) {
+                            currentTags.delete(tag.dataset.tag);
+                            tag.remove();
+                            handleChange();
+                        }
+                    }
+                });
+
+                let saveTimeout;
+                function handleChange() {
+                    clearTimeout(saveTimeout);
+                    saveTimeout = setTimeout(() => {
+                        try {
+                            const language = document.getElementById('language').value;
+                            const code = editor.getValue();
+                            const notes = document.getElementById('notes').value;
+                            const tags = Array.from(currentTags);
+                            
+                            console.log('Sending save message:', {
+                                command: 'save',
+                                language,
+                                code,
+                                notes,
+                                tags
+                            });
+
+                            vscode.postMessage({
+                                command: 'save',
+                                language,
+                                code,
+                                notes,
+                                tags
+                            });
+                        } catch (error) {
+                            console.error('Error in handleChange:', error);
+                        }
+                    }, 500);
+                }
+
+                editor.onDidChangeModelContent(() => handleChange());
+                document.getElementById('notes').addEventListener('input', handleChange);
+            });
+        `;
+
         return `<!DOCTYPE html>
         <html>
             <head>
@@ -221,6 +484,10 @@ export class SnippetEditor {
                         color: var(--vscode-foreground);
                         font-weight: 500;
                     }
+                    label[for="tag-input"], 
+                    label:has(+ #tag-input) {
+                        margin-top: 5px;
+                    }
                     #notes {
                         min-height: 60px;
                         resize: vertical;
@@ -242,7 +509,9 @@ export class SnippetEditor {
                     <select id="language">
                         <option value="">Select a language...</option>
                         ${languageOptions.map(lang => 
-                            `<option value="${lang.value}" ${lang.value === snippet.language ? 'selected' : ''}>${lang.label}</option>`
+                            lang.separator 
+                                ? `<option disabled>${lang.label}</option>`
+                                : `<option value="${lang.value}" ${lang.value === snippet.language ? 'selected' : ''}>${lang.label}</option>`
                         ).join('')}
                     </select>
                 </div>
@@ -265,145 +534,16 @@ export class SnippetEditor {
                 </div>
 
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/loader.js"></script>
-                <script>
-                    const vscode = acquireVsCodeApi();
-                    let currentTags = new Set(${JSON.stringify(snippet.tags || [])});
-                    let editor;
-
-                    require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
-                    require(['vs/editor/editor.main'], function() {
-                        // Define theme to match VS Code
-                        monaco.editor.defineTheme('vscode-dark', {
-                            base: 'vs-dark',
-                            inherit: true,
-                            rules: [],
-                            colors: {
-                                'editor.background': getComputedStyle(document.body).getPropertyValue('--vscode-editor-background'),
-                                'editor.foreground': getComputedStyle(document.body).getPropertyValue('--vscode-editor-foreground')
-                            }
-                        });
-
-                        monaco.editor.setTheme('vscode-dark');
-
-                        // Configure JSX/TSX support
-                        const language = '${snippet.language || 'plaintext'}';
-                        let editorLanguage = language;
-                        
-                        // Map React languages to proper Monaco languages
-                        if (language === 'javascriptreact') {
-                            editorLanguage = 'javascript';
-                            // Enable JSX option for JavaScript
-                            monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
-                                jsx: monaco.languages.typescript.JsxEmit.React,
-                                allowNonTsExtensions: true,
-                                allowJs: true,
-                                target: monaco.languages.typescript.ScriptTarget.Latest
-                            });
-                        } else if (language === 'typescriptreact') {
-                            editorLanguage = 'typescript';
-                            // Enable JSX option for TypeScript
-                            monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-                                jsx: monaco.languages.typescript.JsxEmit.React,
-                                allowNonTsExtensions: true,
-                                target: monaco.languages.typescript.ScriptTarget.Latest
-                            });
-                        }
-
-                        editor = monaco.editor.create(document.getElementById('editor'), {
-                            value: ${JSON.stringify(snippet.code || '')},
-                            language: editorLanguage,
-                            theme: 'vscode-dark',
-                            minimap: { enabled: false },
-                            scrollBeyondLastLine: false,
-                            fontSize: parseInt(getComputedStyle(document.body).getPropertyValue('--vscode-editor-font-size')) || 14,
-                            fontFamily: getComputedStyle(document.body).getPropertyValue('--vscode-editor-font-family'),
-                            automaticLayout: true,
-                            padding: { top: 10, bottom: 10 }
-                        });
-
-                        // Handle language change
-                        document.getElementById('language').addEventListener('change', function() {
-                            const newLanguage = this.value || 'plaintext';
-                            let editorLang = newLanguage;
-                            
-                            // Update JSX/TSX settings when language changes
-                            if (newLanguage === 'javascriptreact') {
-                                editorLang = 'javascript';
-                                monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
-                                    jsx: monaco.languages.typescript.JsxEmit.React,
-                                    allowNonTsExtensions: true,
-                                    allowJs: true,
-                                    target: monaco.languages.typescript.ScriptTarget.Latest
-                                });
-                            } else if (newLanguage === 'typescriptreact') {
-                                editorLang = 'typescript';
-                                monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-                                    jsx: monaco.languages.typescript.JsxEmit.React,
-                                    allowNonTsExtensions: true,
-                                    target: monaco.languages.typescript.ScriptTarget.Latest
-                                });
-                            }
-                            
-                            monaco.editor.setModelLanguage(editor.getModel(), editorLang);
-                            handleChange();
-                        });
-
-                        // Handle tag input
-                        const tagInput = document.getElementById('tag-input');
-                        const tagContainer = document.getElementById('tag-container');
-
-                        tagInput.addEventListener('keydown', function(e) {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                const tag = this.value.trim();
-                                if (tag && !currentTags.has(tag)) {
-                                    currentTags.add(tag);
-                                    const tagElement = document.createElement('span');
-                                    tagElement.className = 'tag';
-                                    tagElement.dataset.tag = tag;
-                                    tagElement.innerHTML = \`\${tag}<span class="tag-remove">&times;</span>\`;
-                                    tagContainer.appendChild(tagElement);
-                                    this.value = '';
-                                    handleChange();
-                                }
-                            }
-                        });
-
-                        // Handle tag removal
-                        tagContainer.addEventListener('click', function(e) {
-                            if (e.target.classList.contains('tag-remove')) {
-                                const tag = e.target.parentElement;
-                                if (tag && tag.dataset.tag) {
-                                    currentTags.delete(tag.dataset.tag);
-                                    tag.remove();
-                                    handleChange();
-                                }
-                            }
-                        });
-
-                        let saveTimeout;
-                        function handleChange() {
-                            clearTimeout(saveTimeout);
-                            saveTimeout = setTimeout(() => {
-                                const language = document.getElementById('language').value;
-                                const code = editor.getValue();
-                                const notes = document.getElementById('notes').value;
-                                
-                                vscode.postMessage({
-                                    command: 'save',
-                                    language,
-                                    code,
-                                    notes,
-                                    tags: Array.from(currentTags)
-                                });
-                            }, 500);
-                        }
-
-                        editor.onDidChangeModelContent(() => handleChange());
-                        document.getElementById('notes').addEventListener('input', handleChange);
-                    });
-                </script>
+                <script>${editorScript}</script>
             </body>
         </html>`;
+    }
+
+    static disposeAll() {
+        // Dispose all panels
+        for (const panel of this.panels.values()) {
+            panel.dispose();
+        }
+        this.panels.clear();
     }
 } 
