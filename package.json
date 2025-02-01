@@ -1,8 +1,8 @@
 {
-    "name": "snippy-snippets",
-    "displayName": "Snippy - Code Snippets Manager",
+    "name": "code-snippets-manager-snippy",
+    "displayName": "Code Snippets Manager - Snippy",
     "description": "A powerful code snippets manager for VS Code",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "publisher": "petercsipkay",
     "icon": "resources/logo.png",
     "repository": {
@@ -31,7 +31,7 @@
             "activitybar": [
                 {
                     "id": "snippets-explorer",
-                    "title": "Snippy Code Snippets Manager",
+                    "title": "Code Snippets Manager",
                     "icon": "resources/logo.svg"
                 }
             ]

@@ -98,9 +98,9 @@ export class SnippetEditor {
             { separator: true, label: '──────────' },
 
             // Web Frameworks
-            { label: 'React', value: 'react' },
+            { label: 'React', value: 'javascriptreact' },
             { label: 'Vue', value: 'vue' },
-            { label: 'Angular', value: 'angular' },
+            { label: 'Angular', value: 'typescript' },
             { label: 'Svelte', value: 'svelte' },
             { label: 'Astro', value: 'astro' },
             { separator: true, label: '──────────' },
@@ -285,9 +285,33 @@ export class SnippetEditor {
 
                         monaco.editor.setTheme('vscode-dark');
 
+                        // Configure JSX/TSX support
+                        const language = '${snippet.language || 'plaintext'}';
+                        let editorLanguage = language;
+                        
+                        // Map React languages to proper Monaco languages
+                        if (language === 'javascriptreact') {
+                            editorLanguage = 'javascript';
+                            // Enable JSX option for JavaScript
+                            monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+                                jsx: monaco.languages.typescript.JsxEmit.React,
+                                allowNonTsExtensions: true,
+                                allowJs: true,
+                                target: monaco.languages.typescript.ScriptTarget.Latest
+                            });
+                        } else if (language === 'typescriptreact') {
+                            editorLanguage = 'typescript';
+                            // Enable JSX option for TypeScript
+                            monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+                                jsx: monaco.languages.typescript.JsxEmit.React,
+                                allowNonTsExtensions: true,
+                                target: monaco.languages.typescript.ScriptTarget.Latest
+                            });
+                        }
+
                         editor = monaco.editor.create(document.getElementById('editor'), {
                             value: ${JSON.stringify(snippet.code || '')},
-                            language: '${snippet.language || 'plaintext'}',
+                            language: editorLanguage,
                             theme: 'vscode-dark',
                             minimap: { enabled: false },
                             scrollBeyondLastLine: false,
@@ -300,7 +324,27 @@ export class SnippetEditor {
                         // Handle language change
                         document.getElementById('language').addEventListener('change', function() {
                             const newLanguage = this.value || 'plaintext';
-                            monaco.editor.setModelLanguage(editor.getModel(), newLanguage);
+                            let editorLang = newLanguage;
+                            
+                            // Update JSX/TSX settings when language changes
+                            if (newLanguage === 'javascriptreact') {
+                                editorLang = 'javascript';
+                                monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+                                    jsx: monaco.languages.typescript.JsxEmit.React,
+                                    allowNonTsExtensions: true,
+                                    allowJs: true,
+                                    target: monaco.languages.typescript.ScriptTarget.Latest
+                                });
+                            } else if (newLanguage === 'typescriptreact') {
+                                editorLang = 'typescript';
+                                monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+                                    jsx: monaco.languages.typescript.JsxEmit.React,
+                                    allowNonTsExtensions: true,
+                                    target: monaco.languages.typescript.ScriptTarget.Latest
+                                });
+                            }
+                            
+                            monaco.editor.setModelLanguage(editor.getModel(), editorLang);
                             handleChange();
                         });
 

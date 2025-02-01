@@ -56,6 +56,8 @@ export class SnippetTreeItem extends vscode.TreeItem {
             // Web Development
             'javascript': 'js',
             'typescript': 'ts',
+            'javascriptreact': 'jsx',
+            'typescriptreact': 'tsx',
             'jsx': 'jsx',
             'tsx': 'tsx',
             'html': 'html',
@@ -67,8 +69,8 @@ export class SnippetTreeItem extends vscode.TreeItem {
             'tailwindcss': 'css',
 
             // Web Frameworks
-            'react': 'jsx',
-            'reactts': 'tsx',
+            'react': 'jsx',  // Legacy support
+            'reactts': 'tsx', // Legacy support
             'vue': 'vue',
             'svelte': 'svelte',
             'angular': 'ts',
