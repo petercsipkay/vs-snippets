@@ -692,4 +692,17 @@ export class LocalStorage {
             throw new Error(`Failed to import data: ${error.message}`);
         }
     }
+
+    async updateFolderParent(folderId: string, newParentId: string | null): Promise<void> {
+        await this.waitForInitialization();
+        const folders = await this.getFoldersData();
+        const updatedFolders = folders.map(folder => {
+            if (folder.id === folderId) {
+                return { ...folder, parentId: newParentId, lastModified: Date.now() };
+            }
+            return folder;
+        });
+        await this.saveFoldersData(updatedFolders);
+        await this.updateBackupFile({ folders: updatedFolders, snippets: await this.getSnippetsData() });
+    }
 } 

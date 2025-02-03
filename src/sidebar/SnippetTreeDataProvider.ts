@@ -79,13 +79,13 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
 
     // Handle drag and drop
     async handleDrop(target: SnippetTreeItem, sources: vscode.DataTransfer): Promise<void> {
-        const snippetData = sources.get('application/vnd.code.tree.snippetsExplorer');
-        if (!snippetData) {
+        const itemData = sources.get('application/vnd.code.tree.snippetsExplorer');
+        if (!itemData) {
             return;
         }
 
-        const sourceItem = JSON.parse(snippetData.value) as SnippetTreeItem;
-        if (sourceItem.type !== 'snippet' || target.type !== 'folder') {
+        const sourceItem = JSON.parse(itemData.value) as SnippetTreeItem;
+        if (target.type !== 'folder') {
             return;
         }
 
@@ -94,25 +94,58 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
             return;
         }
 
-        try {
-            const snippet = await this.localStorage.getSnippet(sourceItem.id);
-            if (snippet) {
-                await this.localStorage.updateSnippet({
-                    id: snippet.id,
-                    folderId: target.id
-                });
-                this.refresh();
+        // Don't allow moving a folder into itself or its descendants
+        if (sourceItem.type === 'folder') {
+            const isTargetDescendant = await this.isFolderDescendant(target.id, sourceItem.id);
+            if (isTargetDescendant) {
+                vscode.window.showErrorMessage('Cannot move a folder into itself or its subfolders');
+                return;
             }
+        }
+
+        try {
+            if (sourceItem.type === 'snippet') {
+                const snippet = await this.localStorage.getSnippet(sourceItem.id);
+                if (snippet) {
+                    await this.localStorage.updateSnippet({
+                        id: snippet.id,
+                        folderId: target.id
+                    });
+                }
+            } else if (sourceItem.type === 'folder') {
+                // Move the folder itself
+                await this.localStorage.updateFolderParent(sourceItem.id, target.id);
+            }
+            this.refresh();
         } catch (error) {
-            vscode.window.showErrorMessage('Failed to move snippet: ' + error);
+            vscode.window.showErrorMessage(`Failed to move ${sourceItem.type}: ` + error);
         }
     }
 
     // Handle drag
     async handleDrag(source: SnippetTreeItem[], dataTransfer: vscode.DataTransfer): Promise<void> {
-        if (source.length === 1 && source[0].type === 'snippet') {
+        if (source.length === 1) {
             dataTransfer.set('application/vnd.code.tree.snippetsExplorer', new vscode.DataTransferItem(JSON.stringify(source[0])));
         }
+    }
+
+    // Helper method to check if a folder is a descendant of another folder
+    private async isFolderDescendant(parentId: string, childId: string): Promise<boolean> {
+        const folders = await this.localStorage.getFolders();
+        let currentId = parentId;
+        
+        while (currentId) {
+            if (currentId === childId) {
+                return true;
+            }
+            const currentFolder = folders.find(f => f.id === currentId);
+            if (!currentFolder || !currentFolder.parentId) {
+                break;
+            }
+            currentId = currentFolder.parentId;
+        }
+        
+        return false;
     }
 
     private snippetMatchesSearch(snippet: Snippet): boolean {
