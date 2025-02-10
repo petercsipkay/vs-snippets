@@ -6,16 +6,72 @@ import * as fs from 'fs';
 import { SnippetTreeItem } from './sidebar/SnippetTreeItem';
 import * as path from 'path';
 
+async function showWelcomeMessage(context: vscode.ExtensionContext): Promise<void> {
+    // Check if we've shown the welcome message before
+    const hasShownWelcome = context.globalState.get('snippets.hasShownWelcome');
+    
+    if (!hasShownWelcome) {
+        const message = 'Welcome to VS Snippets! 🎉 To get started, please configure your backup folder. We recommend using a cloud storage provider (like Dropbox or Google Drive) to sync your snippets across computers.';
+        
+        const result = await vscode.window.showInformationMessage(
+            message,
+            'Configure Now',
+            'Later'
+        );
+
+        if (result === 'Configure Now') {
+            await vscode.commands.executeCommand('snippets.configureBackupFolder');
+        }
+
+        // Mark that we've shown the welcome message
+        await context.globalState.update('snippets.hasShownWelcome', true);
+    }
+}
+
 export function activate(context: vscode.ExtensionContext) {
     const localStorage = new LocalStorage();
     const treeDataProvider = new SnippetTreeDataProvider(localStorage);
     const snippetEditor = new SnippetEditor();
 
+    // Show welcome message for first-time installation
+    showWelcomeMessage(context).catch(error => {
+        console.error('Error showing welcome message:', error);
+    });
+
+    // Register the configure backup folder command
+    let configureBackupFolder = vscode.commands.registerCommand('snippets.configureBackupFolder', async () => {
+        const options: vscode.OpenDialogOptions = {
+            canSelectFiles: false,
+            canSelectFolders: true,
+            canSelectMany: false,
+            title: 'Select Backup Folder',
+            openLabel: 'Select Folder'
+        };
+
+        const result = await vscode.window.showOpenDialog(options);
+        if (result && result[0]) {
+            const folderPath = result[0].fsPath;
+            // Save the backup folder path to settings
+            await vscode.workspace.getConfiguration('snippets').update('backupFolder', folderPath, vscode.ConfigurationTarget.Global);
+            
+            vscode.window.showInformationMessage(
+                `Backup folder set to: ${folderPath}\n\nTip: To sync between computers, choose a folder in your cloud storage (Dropbox, Google Drive, etc).`
+            );
+        }
+    });
+
+    // Register help website command
+    let openHelpWebsite = vscode.commands.registerCommand('snippets.openHelpWebsite', () => {
+        vscode.env.openExternal(vscode.Uri.parse('https://vssnippets.com'));
+    });
+
     // Add disposables to context
     context.subscriptions.push(
         localStorage,
         treeDataProvider,
-        snippetEditor
+        snippetEditor,
+        configureBackupFolder,
+        openHelpWebsite
     );
 
     // Check for auto-sync on startup
@@ -110,7 +166,8 @@ export function activate(context: vscode.ExtensionContext) {
                 { label: 'Configure Backup Folder', command: 'snippets.configureBackupFolder' },
                 { label: 'Sync from Backup Folder', command: 'snippets.syncFromBackup' },
                 { label: 'Import Snippets', command: 'snippets.importSnippets' },
-                { label: 'Export Snippets', command: 'snippets.exportSnippets' }
+                { label: 'Export Snippets', command: 'snippets.exportSnippets' },
+                { label: '$(question) Get Help at vssnippets.com', command: 'snippets.openHelpWebsite' }
             ];
 
             const selected = await vscode.window.showQuickPick(items, {
@@ -264,28 +321,6 @@ export function activate(context: vscode.ExtensionContext) {
                     treeDataProvider.refresh();
                 } catch (error) {
                     vscode.window.showErrorMessage('Failed to delete item: ' + (error as Error).message);
-                }
-            }
-        }),
-
-        vscode.commands.registerCommand('snippets.configureBackupFolder', async () => {
-            const currentFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
-            
-            const options: vscode.OpenDialogOptions = {
-                canSelectFiles: false,
-                canSelectFolders: true,
-                canSelectMany: false,
-                defaultUri: currentFolder ? vscode.Uri.file(currentFolder) : undefined,
-                openLabel: 'Select Backup Folder'
-            };
-
-            const result = await vscode.window.showOpenDialog(options);
-            if (result && result[0]) {
-                try {
-                    await vscode.workspace.getConfiguration('snippets').update('backupFolder', result[0].fsPath, true);
-                    vscode.window.showInformationMessage('Backup folder configured successfully');
-                } catch (error) {
-                    vscode.window.showErrorMessage('Failed to configure backup folder: ' + error);
                 }
             }
         }),

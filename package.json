@@ -1,6 +1,6 @@
 {
     "name": "code-snippets-manager-snippy",
-    "displayName": "Code Snippets Manager - Snippy",
+    "displayName": "Code Snippets Manager - VS Snippets",
     "description": "✨ Professional Code Snippets Manager for VS Code supercharged your productivity",
     "version": "1.0.5",
     "publisher": "petercsipkay",
@@ -40,7 +40,7 @@
             "snippets-explorer": [
                 {
                     "id": "snippetsExplorer",
-                    "name": "Snippy",
+                    "name": "VS Snippets",
                     "icon": "resources/snippets.svg"
                 }
             ]
@@ -174,23 +174,22 @@
             },
             {
                 "command": "snippets.configureBackupFolder",
-                "title": "Configure Backup Folder"
+                "title": "Configure Backup Folder",
+                "category": "VS Snippets"
+            },
+            {
+                "command": "snippets.openHelpWebsite",
+                "title": "Get Help at vssnippets.com",
+                "category": "VS Snippets"
             }
         ],
         "configuration": {
-            "title": "Snippets Manager",
+            "title": "VS Snippets",
             "properties": {
                 "snippets.backupFolder": {
                     "type": "string",
                     "default": "",
-                    "description": "Folder path where snippet backups will be saved",
-                    "scope": "application"
-                },
-                "snippets.autoSyncOnStartup": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Automatically sync snippets from backup folder when VS Code starts",
-                    "scope": "application"
+                    "description": "The folder path where your snippets will be backed up. For cross-computer sync, choose a cloud storage folder (Dropbox, Google Drive, etc.)"
                 }
             }
         }

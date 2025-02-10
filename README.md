@@ -1,4 +1,4 @@
-# VS Code Snippets Manager - Snippy
+# VS Code Snippets Manager - VS Snippets
 
 A powerful and user friendly VS Code extension for managing your code snippets with local backup support. Works with VS Code and all VS Code-based editors including VSCodium, GitPod, and GitHub Codespaces.
 
