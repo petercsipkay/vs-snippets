@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 export class SnippetEditor {
-    private static readonly viewType = 'snippetEditor';
+    private static readonly viewType = 'text';
     private static panels = new Map<string, vscode.WebviewPanel>();
     private disposables: vscode.Disposable[] = [];
 
@@ -33,28 +33,16 @@ export class SnippetEditor {
             return existingPanel;
         }
 
-        // Get extension URI for icons
-        const extensionUri = vscode.extensions.getExtension('petercsipkay.code-snippets-manager-snippy')?.extensionUri;
-        if (!extensionUri) {
-            throw new Error('Could not find extension URI');
-        }
-
         // Create new panel for the snippet
         const panel = vscode.window.createWebviewPanel(
             this.viewType,
-            snippet.name,
+            `\u200b\u200b\u200b${snippet.name}`,
             vscode.ViewColumn.One,
             {
                 enableScripts: true,
                 retainContextWhenHidden: true
             }
         );
-
-        // Set the icon path
-        panel.iconPath = {
-            light: vscode.Uri.joinPath(extensionUri, 'media', 'snippy-light.svg'),
-            dark: vscode.Uri.joinPath(extensionUri, 'media', 'snippy-dark.svg')
-        };
 
         // Store the panel
         this.panels.set(snippet.id, panel);
@@ -426,6 +414,7 @@ export class SnippetEditor {
                         justify-content: space-between;
                         align-items: center;
                         padding: 10px 20px;
+                        margin-left: -20px;
                         background-color: var(--vscode-editor-background);
                         border-bottom: 1px solid var(--vscode-panel-border);
                         gap: 20px;
