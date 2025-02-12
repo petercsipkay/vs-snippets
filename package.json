@@ -1,6 +1,6 @@
 {
-    "name": "code-snippets-manager-snippy",
-    "displayName": "Code Snippets Manager - VS Snippets",
+    "name": "vs-snippets",
+    "displayName": "VS Snippets - Code Snippets Manager",
     "description": "✨ Professional Code Snippets Manager for VS Code supercharged your productivity",
     "version": "1.0.5",
     "publisher": "petercsipkay",
@@ -22,6 +22,7 @@
     },
     "categories": [
         "Programming Languages",
+        "Snippets",
         "Other"
     ],
     "activationEvents": [],
