@@ -115,6 +115,16 @@
                     "command": "snippets.moveToRoot",
                     "when": "view == snippetsExplorer && viewItem == subfolder",
                     "group": "2_modification@1"
+                },
+                {
+                    "command": "snippets.moveUp",
+                    "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
+                    "group": "2_modification@2"
+                },
+                {
+                    "command": "snippets.moveDown",
+                    "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
+                    "group": "2_modification@3"
                 }
             ]
         },
@@ -193,6 +203,16 @@
                 "command": "snippets.moveToRoot",
                 "title": "Move to Root Level",
                 "icon": "$(root-folder)"
+            },
+            {
+                "command": "snippets.moveUp",
+                "title": "Move Up",
+                "icon": "$(arrow-up)"
+            },
+            {
+                "command": "snippets.moveDown",
+                "title": "Move Down",
+                "icon": "$(arrow-down)"
             }
         ],
         "configuration": {

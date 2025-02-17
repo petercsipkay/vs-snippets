@@ -4,6 +4,7 @@ export interface Folder {
     parentId: string | null;  // null for root folders, string ID for sub-folders
     type: 'primary' | 'secondary';  // To distinguish between primary and secondary folders
     lastModified: number;  // Unix timestamp in milliseconds
+    order?: number;
 }
 
 export interface Snippet {

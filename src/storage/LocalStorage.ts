@@ -295,21 +295,25 @@ export class LocalStorage {
         return this.getSnippetsData();
     }
 
-    async addFolder(name: string, parentId: string | null = null, type: 'primary' | 'secondary' = 'primary'): Promise<Folder> {
-        await this.waitForInitialization();
+    async addFolder(name: string, parentId: string | null = null): Promise<void> {
+        const folders = await this.getFoldersData();
+        
+        // Get max order of siblings
+        const siblings = folders.filter(f => f.parentId === parentId);
+        const maxOrder = Math.max(...siblings.map(f => f.order || 0), -1);
+        
         const newFolder: Folder = {
             id: Date.now().toString(),
             name,
             parentId,
-            type,
-            lastModified: Date.now()
+            type: 'primary',
+            lastModified: Date.now(),
+            order: maxOrder + 1
         };
 
-        const folders = await this.getFolders();
         folders.push(newFolder);
         await this.saveFoldersData(folders);
         await this.updateBackupFile({ folders, snippets: await this.getSnippetsData() });
-        return newFolder;
     }
 
     async addSnippet(snippet: Omit<Snippet, 'id' | 'lastModified'>): Promise<Snippet> {
@@ -736,6 +740,71 @@ export class LocalStorage {
             });
         } catch (error) {
             throw new Error(`Failed to move folder: ${error}`);
+        }
+    }
+
+    async updateFolderOrder(folderId: string, direction: 'up' | 'down'): Promise<void> {
+        try {
+            const folders = await this.getFoldersData();
+            
+            // Get current folder
+            const currentFolder = folders.find(f => f.id === folderId);
+            if (!currentFolder) {
+                throw new Error('Folder not found');
+            }
+
+            // Get siblings (folders with same parent)
+            const siblings = folders
+                .filter(f => f.parentId === currentFolder.parentId)
+                .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+            const currentIndex = siblings.findIndex(f => f.id === folderId);
+            if (currentIndex === -1) {
+                throw new Error('Current folder not found in siblings');
+            }
+
+            // Calculate target index
+            const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+            if (targetIndex < 0 || targetIndex >= siblings.length) {
+                return; // Can't move further
+            }
+
+            // Get target folder
+            const targetFolder = siblings[targetIndex];
+
+            // If folders don't have order yet, initialize them
+            if (currentFolder.order === undefined) {
+                // Initialize orders for all siblings if they don't exist
+                siblings.forEach((folder, index) => {
+                    folder.order = index * 100; // Use multiples of 100 to leave room for insertions
+                });
+            }
+
+            // Swap orders
+            const tempOrder = currentFolder.order;
+            currentFolder.order = targetFolder.order;
+            targetFolder.order = tempOrder;
+
+            // Update the folders in the main array
+            folders.forEach(folder => {
+                if (folder.id === currentFolder.id) {
+                    folder.order = currentFolder.order;
+                } else if (folder.id === targetFolder.id) {
+                    folder.order = targetFolder.order;
+                }
+            });
+
+            // Save the updated folders
+            await this.saveFoldersData(folders);
+            
+            // Update backup if needed
+            await this.updateBackupFile({
+                folders,
+                snippets: await this.getSnippetsData()
+            });
+        } catch (error) {
+            console.error('Error updating folder order:', error);
+            throw new Error(`Failed to update folder order: ${error}`);
         }
     }
 } 

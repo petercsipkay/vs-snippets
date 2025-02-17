@@ -207,7 +207,14 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
         try {
             if (!element) {
                 // Root level - show only root folders
-                const rootFolders = this.folders.filter(folder => folder.parentId === null);
+                const rootFolders = this.folders
+                    .filter(folder => folder.parentId === null)
+                    .sort((a, b) => {
+                        // Initialize order if undefined
+                        const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
+                        const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
+                        return orderA - orderB;
+                    });
                 
                 // If searching, also show matching snippets at root level
                 if (this.searchQuery) {
@@ -240,7 +247,14 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
                 ));
             } else if (element.type === 'folder') {
                 // Folder level - show subfolders and snippets
-                const subfolders = this.folders.filter(folder => folder.parentId === element.id);
+                const subfolders = this.folders
+                    .filter(folder => folder.parentId === element.id)
+                    .sort((a, b) => {
+                        // Initialize order if undefined
+                        const orderA = a.order ?? Number.MAX_SAFE_INTEGER;
+                        const orderB = b.order ?? Number.MAX_SAFE_INTEGER;
+                        return orderA - orderB;
+                    });
                 const folderSnippets = this.snippets.filter(snippet => snippet.folderId === element.id);
 
                 return [

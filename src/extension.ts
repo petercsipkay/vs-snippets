@@ -85,6 +85,25 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
+    // Register move up/down commands
+    let moveUpCommand = vscode.commands.registerCommand('snippets.moveUp', async (item: SnippetTreeItem) => {
+        try {
+            await localStorage.updateFolderOrder(item.id, 'up');
+            treeDataProvider.refresh();
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to move folder up: ${error}`);
+        }
+    });
+
+    let moveDownCommand = vscode.commands.registerCommand('snippets.moveDown', async (item: SnippetTreeItem) => {
+        try {
+            await localStorage.updateFolderOrder(item.id, 'down');
+            treeDataProvider.refresh();
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to move folder down: ${error}`);
+        }
+    });
+
     // Add disposables to context
     context.subscriptions.push(
         localStorage,
@@ -92,7 +111,9 @@ export function activate(context: vscode.ExtensionContext) {
         snippetEditor,
         configureBackupFolder,
         openHelpWebsite,
-        moveToRootCommand
+        moveToRootCommand,
+        moveUpCommand,
+        moveDownCommand
     );
 
     // Check for auto-sync on startup
@@ -266,11 +287,13 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('snippets.addFolder', async () => {
             const name = await vscode.window.showInputBox({
                 prompt: 'Enter folder name',
-                placeHolder: 'My Folder'
+                placeHolder: 'My Snippets'
             });
+
             if (name) {
                 try {
-                    await localStorage.addFolder(name, null, 'primary' as const);
+                    // Pass only name for root folder (parentId will default to null)
+                    await localStorage.addFolder(name);
                     treeDataProvider.refresh();
                 } catch (error) {
                     vscode.window.showErrorMessage('Failed to create folder: ' + error);
@@ -283,9 +306,11 @@ export function activate(context: vscode.ExtensionContext) {
                 prompt: 'Enter subfolder name',
                 placeHolder: 'My Subfolder'
             });
+
             if (name) {
                 try {
-                    const folder = await localStorage.addFolder(name, parentItem.id, 'primary' as const);
+                    // Pass name and parentId
+                    await localStorage.addFolder(name, parentItem.id);
                     treeDataProvider.refresh();
                 } catch (error) {
                     vscode.window.showErrorMessage('Failed to create subfolder: ' + error);
