@@ -21,7 +21,13 @@ export class SnippetTreeItem extends vscode.TreeItem {
         super(label, collapsibleState);
 
         this.tooltip = type === 'folder' ? `Folder: ${label}` : label;
-        this.contextValue = type;
+
+        // Set the contextValue based on whether it's a root folder or subfolder
+        if (type === 'folder') {
+            this.contextValue = parentId ? 'subfolder' : 'folder';
+        } else {
+            this.contextValue = 'snippet';
+        }
 
         // Enable drag for snippets and folders, but only allow dropping on folders
         this.draggable = true;

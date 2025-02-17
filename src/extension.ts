@@ -65,13 +65,34 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.env.openExternal(vscode.Uri.parse('https://vssnippets.com'));
     });
 
+    // Register the moveToRoot command
+    let moveToRootCommand = vscode.commands.registerCommand('snippets.moveToRoot', async (item: SnippetTreeItem) => {
+        try {
+            // Get the folder ID from the tree item
+            const folderId = item.id;
+            if (!folderId) {
+                return;
+            }
+
+            // Move the folder to root
+            await localStorage.moveFolder(folderId, '');
+
+            // Refresh the tree view
+            treeDataProvider.refresh();
+
+        } catch (error) {
+            vscode.window.showErrorMessage(`Failed to move folder to root: ${error}`);
+        }
+    });
+
     // Add disposables to context
     context.subscriptions.push(
         localStorage,
         treeDataProvider,
         snippetEditor,
         configureBackupFolder,
-        openHelpWebsite
+        openHelpWebsite,
+        moveToRootCommand
     );
 
     // Check for auto-sync on startup
@@ -92,8 +113,9 @@ export function activate(context: vscode.ExtensionContext) {
             handleDrag: (source: readonly vscode.TreeItem[], treeDataTransfer: vscode.DataTransfer) => {
                 return treeDataProvider.handleDrag(source as SnippetTreeItem[], treeDataTransfer);
             },
-            handleDrop: async (target: vscode.TreeItem, sources: vscode.DataTransfer) => {
-                return treeDataProvider.handleDrop(target as SnippetTreeItem, sources);
+            handleDrop: async (target: vscode.TreeItem | undefined, sources: vscode.DataTransfer) => {
+                // Pass undefined target when dropping in empty area
+                return treeDataProvider.handleDrop(target as SnippetTreeItem | undefined, sources);
             }
         }
     });

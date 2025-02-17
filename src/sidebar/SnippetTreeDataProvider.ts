@@ -78,13 +78,29 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
     }
 
     // Handle drag and drop
-    async handleDrop(target: SnippetTreeItem, sources: vscode.DataTransfer): Promise<void> {
+    async handleDrop(target: SnippetTreeItem | undefined, sources: vscode.DataTransfer): Promise<void> {
         const itemData = sources.get('application/vnd.code.tree.snippetsExplorer');
         if (!itemData) {
             return;
         }
 
         const sourceItem = JSON.parse(itemData.value) as SnippetTreeItem;
+        
+        // If target is undefined, we're dropping to root level
+        if (!target) {
+            if (sourceItem.type === 'folder' && sourceItem.parentId !== null) {  // Only move if not already at root
+                try {
+                    console.log('Moving folder to root:', sourceItem.id);
+                    await this.localStorage.updateFolderParent(sourceItem.id, null);
+                    await this.refresh();
+                } catch (error) {
+                    vscode.window.showErrorMessage(`Failed to move folder to root: ${error}`);
+                }
+            }
+            return;
+        }
+
+        // Don't proceed if target is not a folder
         if (target.type !== 'folder') {
             return;
         }
@@ -118,7 +134,7 @@ export class SnippetTreeDataProvider implements vscode.TreeDataProvider<SnippetT
             }
             this.refresh();
         } catch (error) {
-            vscode.window.showErrorMessage(`Failed to move ${sourceItem.type}: ` + error);
+            vscode.window.showErrorMessage(`Failed to move ${sourceItem.type}: ${error}`);
         }
     }
 

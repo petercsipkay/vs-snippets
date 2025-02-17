@@ -705,4 +705,37 @@ export class LocalStorage {
         await this.saveFoldersData(updatedFolders);
         await this.updateBackupFile({ folders: updatedFolders, snippets: await this.getSnippetsData() });
     }
+
+    async moveFolder(sourcePath: string, targetPath: string): Promise<void> {
+        try {
+            // Get current data
+            const data = await this.getAllData();
+            
+            // Find the folder to move
+            const folderToMove = data.folders.find(f => f.id === sourcePath);
+            if (!folderToMove) {
+                throw new Error('Source folder not found');
+            }
+
+            // Update the folder's parent ID
+            if (targetPath === '') {
+                // Moving to root
+                folderToMove.parentId = null;
+            } else {
+                // Moving to another folder
+                folderToMove.parentId = targetPath;
+            }
+
+            // Update last modified timestamp
+            folderToMove.lastModified = Date.now();
+
+            // Save the updated data
+            await this.syncData({
+                folders: data.folders,
+                snippets: data.snippets
+            });
+        } catch (error) {
+            throw new Error(`Failed to move folder: ${error}`);
+        }
+    }
 } 

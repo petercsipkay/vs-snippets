@@ -42,7 +42,8 @@
                 {
                     "id": "snippetsExplorer",
                     "name": "VS Snippets",
-                    "icon": "resources/snippets.svg"
+                    "icon": "resources/snippets.svg",
+                    "dragAndDropController": true
                 }
             ]
         },
@@ -72,18 +73,18 @@
             "view/item/context": [
                 {
                     "command": "snippets.addSubfolder",
-                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
                     "group": "inline@1"
                 },
                 {
                     "command": "snippets.addSnippet",
-                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
                     "group": "inline@2"
                 },
                 {
                     "command": "snippets.deleteItem",
-                    "when": "view == snippetsExplorer && viewItem == folder",
-                    "group": "inline@3"
+                    "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
+                    "group": "inline@6"
                 },
                 {
                     "command": "snippets.deleteItem",
@@ -92,23 +93,28 @@
                 },
                 {
                     "command": "snippets.addSubfolder",
-                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
                     "group": "1_creation@1"
                 },
                 {
                     "command": "snippets.addSnippet",
-                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
                     "group": "1_creation@2"
                 },
                 {
                     "command": "snippets.renameFolder",
-                    "when": "view == snippetsExplorer && viewItem == folder",
+                    "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
                     "group": "1_modification"
                 },
                 {
                     "command": "snippets.renameSnippet",
                     "when": "view == snippetsExplorer && viewItem == snippet",
                     "group": "1_modification"
+                },
+                {
+                    "command": "snippets.moveToRoot",
+                    "when": "view == snippetsExplorer && viewItem == subfolder",
+                    "group": "2_modification@1"
                 }
             ]
         },
@@ -182,6 +188,11 @@
                 "command": "snippets.openHelpWebsite",
                 "title": "Get Help at vssnippets.com",
                 "category": "VS Snippets"
+            },
+            {
+                "command": "snippets.moveToRoot",
+                "title": "Move to Root Level",
+                "icon": "$(root-folder)"
             }
         ],
         "configuration": {
