@@ -21,9 +21,25 @@
         "vscode": "^1.87.0"
     },
     "categories": [
-        "Programming Languages",
         "Snippets",
+        "Programming Languages",
         "Other"
+    ],
+    "keywords": [
+        "snippets",
+        "code-snippets",
+        "snippet-manager",
+        "code-management",
+        "productivity",
+        "code-library",
+        "code-templates",
+        "code-organization",
+        "code-reuse",
+        "folder-organization",
+        "drag-and-drop",
+        "backup",
+        "sync",
+        "cloud-sync"
     ],
     "activationEvents": [],
     "main": "./dist/extension.js",
