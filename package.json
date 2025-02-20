@@ -27,9 +27,17 @@
     ],
     "keywords": [
         "snippets",
-        "code-snippets",
-        "snippet-manager",
-        "code-management",
+        "bookmark",
+        "code",
+        "bookmarks",
+        "Code Blocks",
+        "Collections",
+        "Code Snippets",
+        "Code Snippet Manager",
+        "Code Snippet Library",
+        "Code Snippet Templates",
+        "Code Snippet Organization",
+        "Code Snippet Reuse",
         "productivity",
         "code-library",
         "code-templates",
@@ -229,6 +237,11 @@
                 "command": "snippets.moveDown",
                 "title": "Move Down",
                 "icon": "$(arrow-down)"
+            },
+            {
+                "command": "snippets.enterLicense",
+                "title": "Enter License Key",
+                "category": "VS Snippets"
             }
         ],
         "configuration": {
