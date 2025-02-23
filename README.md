@@ -2,6 +2,8 @@
 
 A powerful and user friendly VS Code extension for managing your code snippets with local backup support. Works with VS Code and all VS Code-based editors including VSCodium, GitPod, and GitHub Codespaces.
 
+![VS Snippets Preview](resources/preview.png)
+
 ## Features
 
 -   📝 Create and organize code snippets with a modern editor
