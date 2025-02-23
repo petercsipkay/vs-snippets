@@ -2,8 +2,9 @@
     "name": "vs-snippets",
     "displayName": "VS Snippets - Code Snippets Manager",
     "description": "✨ Professional Code Snippets Manager for VS Code supercharged your productivity",
-    "version": "1.0.5",
+    "version": "1.0.0",
     "publisher": "petercsipkay",
+    "website": "https://vssnippets.com",
     "icon": "resources/logo.png",
     "repository": {
         "type": "git",
@@ -16,7 +17,7 @@
     "author": {
         "name": "Peter Csipkay"
     },
-    "license": "MIT",
+    "license": "Commercial",
     "engines": {
         "vscode": "^1.87.0"
     },

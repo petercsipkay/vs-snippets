@@ -414,10 +414,12 @@ export class SnippetEditor {
                         justify-content: space-between;
                         align-items: center;
                         padding: 10px 20px;
-                        margin-left: -20px;
                         background-color: var(--vscode-editor-background);
                         border-bottom: 1px solid var(--vscode-panel-border);
                         gap: 20px;
+                    }
+                    .header-title {
+                        flex-grow: 1;
                     }
                     .header select {
                         width: 200px;
@@ -483,8 +485,8 @@ export class SnippetEditor {
                     }
                     h2 {
                         margin: 0;
+                        padding: 6px 0;
                         color: var(--vscode-foreground);
-                        flex-grow: 1;
                     }
                     .editor-container {
                         flex-grow: 1;
@@ -494,7 +496,9 @@ export class SnippetEditor {
             </head>
             <body>
                 <div class="header">
-                    <h2>${snippet.name}</h2>
+                    <div class="header-title">
+                        <h2>${snippet.name}</h2>
+                    </div>
                     <select id="language">
                         <option value="">Select a language...</option>
                         ${languageOptions.map(lang => 
@@ -504,7 +508,7 @@ export class SnippetEditor {
                         ).join('')}
                     </select>
                 </div>
-                
+
                 <div class="top-section">
                     <label>Notes:</label>
                     <textarea id="notes" rows="3">${snippet.notes || ''}</textarea>
