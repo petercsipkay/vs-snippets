@@ -1,8 +1,27 @@
 # VS Code Snippets Manager - VS Snippets
 
-A powerful and user friendly VS Code extension for managing your code snippets with local backup support. Works with VS Code and all VS Code-based editors including VSCodium, GitPod, and GitHub Codespaces.
+Supercharge your coding workflow with VS Snippets, a powerful and user-friendly code snippet manager for VS Code. Save and organize your frequently used code snippets with support for 40+ programming languages including JavaScript, Python, Java, C++, Rust, TypeScript, Go, and many more.
 
-![VS Snippets Preview](resources/preview.png)
+Perfect for developers who want to:
+
+-   Save time by reusing common code patterns
+-   Keep code snippets organized and easily searchable
+-   Share snippets across multiple projects and devices
+-   Maintain a personal code library with smart categorization
+
+Works seamlessly with VS Code and all VS Code-based editors including VSCodium, GitPod, and GitHub Codespaces. Features local backup support and cloud sync capabilities to keep your snippets safe and accessible everywhere.
+
+## Quick Demo
+
+📺 [Watch the full video tutorial on YouTube](https://www.youtube.com/watch?v=Dveo_WSv2rI)
+
+See VS Snippets in action:
+
+![VS Snippets Demo](https://res.cloudinary.com/doy6thjn1/image/upload/v1740317248/vssnippets/vssnippets_ii5q39.gif)
+
+## Overview
+
+![VS Snippets Preview](https://res.cloudinary.com/doy6thjn1/image/upload/v1740307026/vssnippets/preview_oah8xi.png)
 
 ## Features
 
@@ -11,6 +30,8 @@ A powerful and user friendly VS Code extension for managing your code snippets w
     -   Create folders and subfolders
     -   Drag and drop snippets and folders
     -   Rename folders and snippets
+    -   Delete items you no longer need
+    -   Split screen feature for copy snippets to projects
 -   🔍 Powerful search functionality
     -   Search in snippet names, content, notes, and tags
     -   Real-time search results
@@ -30,6 +51,23 @@ A powerful and user friendly VS Code extension for managing your code snippets w
     -   Cloud sync support (via Dropbox, Google Drive, etc.)
 -   🔄 Cross-platform compatibility
     -   Works with VS Code based editors
+
+## Support & Contact
+
+Need help? We're here for you:
+
+-   📧 Email: support@vssnippets.com
+-   🌐 Website: [vssnippets.com](https://vssnippets.com)
+-   📚 Documentation: [vssnippets.com/docs](https://vssnippets.com/docs)
+-   🐛 Report Issues: [GitHub Issues](https://github.com/csipkay/snippy-snippets/issues)
+
+## Installation
+
+1. Open VS Code
+2. Go to Extensions (Ctrl+Shift+X / Cmd+Shift+X)
+3. Search for "VS Snippets"
+4. Click Install
+5. Reload VS Code when prompted
 
 ## Getting Started
 
@@ -95,5 +133,3 @@ Tips for cloud sync:
 -   Use the same backup folder path on all your computers
 -   Let the sync complete before closing VS Code
 -   If conflicts occur, you can always import the backup file manually
-
-## License
