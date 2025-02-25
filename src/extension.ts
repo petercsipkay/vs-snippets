@@ -128,24 +128,56 @@ async function showLicenseModal(context: vscode.ExtensionContext) {
 
 async function showWelcomeMessage(context: vscode.ExtensionContext): Promise<void> {
     try {
-        // Check if license is already validated
         const hasShownWelcome = context.globalState.get('snippets.hasShownWelcome');
+        const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
         
-        if (!hasShownWelcome) {
-            const message = 'Welcome to VS Snippets! 🎉 To get started, please configure your backup folder. We recommend using a cloud storage provider (like Dropbox or Google Drive) to sync your snippets across computers.';
+        if (!hasShownWelcome || !backupFolder) {
+            const message = 'Welcome to VS Snippets! 🎉\n\n' +
+                'To get started and enable cross-device sync:\n\n' +
+                '1. Configure a backup folder (recommended: use Dropbox/Google Drive)\n' +
+                '   This allows you to sync your snippets across different computers\n\n' +
+                '2. Start saving your code snippets\n' +
+                '   Use the sidebar to organize and manage your snippets\n\n' +
+                '3. Access them from any computer\n' +
+                '   Your snippets will automatically sync when you open VS Code';
             
             const result = await vscode.window.showInformationMessage(
                 message,
-                'Configure Now',
-                'Later'
+                { modal: true, detail: 'Choose a cloud storage folder (like Dropbox or Google Drive) to enable cross-device sync.' },
+                'Configure Backup Folder',
+                'Configure Later'
             );
 
-            if (result === 'Configure Now') {
-                await vscode.commands.executeCommand('snippets.configureBackupFolder');
-            }
+            if (result === 'Configure Backup Folder') {
+                const options: vscode.OpenDialogOptions = {
+                    canSelectFiles: false,
+                    canSelectFolders: true,
+                    canSelectMany: false,
+                    title: 'Select Backup Folder',
+                    openLabel: 'Select Folder'
+                };
 
-            // Mark that we've shown the welcome message
-            await context.globalState.update('snippets.hasShownWelcome', true);
+                const folderResult = await vscode.window.showOpenDialog(options);
+                if (folderResult && folderResult[0]) {
+                    const folderPath = folderResult[0].fsPath;
+                    
+                    // Save the backup folder path to settings
+                    await vscode.workspace.getConfiguration('snippets').update('backupFolder', folderPath, vscode.ConfigurationTarget.Global);
+                    
+                    // Create snippets.json if it doesn't exist
+                    const backupPath = path.join(folderPath, 'snippets.json');
+                    if (!await fileExists(backupPath)) {
+                        await fs.promises.writeFile(backupPath, JSON.stringify({ version: "1.0", data: [] }));
+                    }
+                    
+                    vscode.window.showInformationMessage(
+                        `Backup folder set to: ${folderPath}\n\nTip: To sync between computers, choose a folder in your cloud storage (Dropbox, Google Drive, etc).`
+                    );
+
+                    // Mark welcome as shown since they configured the backup
+                    await context.globalState.update('snippets.hasShownWelcome', true);
+                }
+            }
         }
     } catch (error: any) {
         // Only log real errors, ignore cancellation
@@ -266,7 +298,10 @@ export async function activate(context: vscode.ExtensionContext) {
         const treeDataProvider = new SnippetTreeDataProvider(localStorage);
         const snippetEditor = new SnippetEditor();
 
-        // First, try to auto-sync immediately
+        // Show welcome message first
+        await showWelcomeMessage(context);
+
+        // Then try to auto-sync
         await autoSyncFromBackup(context, localStorage, treeDataProvider);
 
         // Set up file watcher for backup file
@@ -289,15 +324,8 @@ export async function activate(context: vscode.ExtensionContext) {
             })
         );
 
-        // Then show welcome message and license modal if needed
-        await Promise.all([
-            showWelcomeMessage(context),
-            showLicenseModal(context)
-        ]).catch(error => {
-            if (error.name !== 'Canceled') {
-                console.error('Error during startup:', error);
-            }
-        });
+        // Show license modal if needed
+        await showLicenseModal(context);
 
         // Modify the configureBackupFolder command
         let configureBackupFolder = vscode.commands.registerCommand('snippets.configureBackupFolder', async () => {
