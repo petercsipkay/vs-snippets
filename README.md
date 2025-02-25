@@ -1,6 +1,15 @@
 # VS Code Snippets Manager - VS Snippets
 
-Supercharge your coding workflow with VS Snippets, a powerful and user-friendly code snippet manager for VS Code. Save and organize your frequently used code snippets with support for 40+ programming languages including JavaScript, Python, Java, C++, Rust, TypeScript, Go, and many more.
+Supercharge your coding workflow with VS Snippets, a powerful and user-friendly code snippet manager for VS Code. Try it free and save and organize your frequently used code snippets with support for 40+ programming languages including JavaScript, Python, Java, C++, Rust, TypeScript, Go, and many more.
+
+## Free Trial & Pricing
+
+Start with our free trial to experience all features. When you're ready to unlock the full version:
+
+-   🚀 Developer License: $9.99 - Perfect for individual developers
+-   👥 Team License: $49.99 - Ideal for teams and organizations
+
+[Get Your License Now](https://vssnippets.com)
 
 Perfect for developers who want to:
 

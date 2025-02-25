@@ -1,19 +1,19 @@
 {
     "name": "vs-snippets",
     "displayName": "VS Snippets - Code Snippets Manager",
-    "description": "✨ Professional Code Snippets Manager for VS Code supercharged your productivity",
-    "version": "1.0.0",
+    "description": "✨ Professional Code Snippets Manager for VS Code (Free Trial) - Supercharge your productivity with organized code snippets",
+    "version": "1.0.2",
     "publisher": "petercsipkay",
     "website": "https://vssnippets.com",
     "icon": "resources/logo.png",
     "repository": {
         "type": "git",
-        "url": "https://github.com/csipkay/snippy-snippets"
+        "url": "https://github.com/petercsipkay/vssnippetscom"
     },
     "bugs": {
-        "url": "https://github.com/csipkay/snippy-snippets/issues"
+        "url": "https://github.com/petercsipkay/vssnippetscom/issues"
     },
-    "homepage": "https://github.com/csipkay/snippy-snippets#readme",
+    "homepage": "https://vssnippets.com",
     "author": {
         "name": "Peter Csipkay"
     },
