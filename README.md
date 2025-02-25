@@ -26,7 +26,7 @@ Works seamlessly with VS Code and all VS Code-based editors including VSCodium, 
 
 See VS Snippets in action:
 
-![VS Snippets Demo](https://res.cloudinary.com/doy6thjn1/image/upload/v1740317248/vssnippets/vssnippets_ii5q39.gif)
+![VS Snippets Demo](https://res.cloudinary.com/doy6thjn1/image/upload/v1740520101/vssnippets/Code_lmyekp.gif)
 
 ## Overview
 

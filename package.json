@@ -1,8 +1,8 @@
 {
     "name": "vs-snippets",
     "displayName": "VS Snippets - Code Snippets Manager",
-    "description": "✨ Professional Code Snippets Manager for VS Code (Free Trial) - Supercharge your productivity with organized code snippets",
-    "version": "1.0.2",
+    "description": "✨ Professional Code Snippets Manager for VS Code - Supercharge your productivity with organized code snippets",
+    "version": "1.0.1",
     "publisher": "petercsipkay",
     "website": "https://vssnippets.com",
     "icon": "resources/logo.png",
