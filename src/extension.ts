@@ -6,125 +6,9 @@ import * as fs from 'fs';
 import { SnippetTreeItem } from './sidebar/SnippetTreeItem';
 import * as path from 'path';
 import * as os from 'os';
-import * as crypto from 'crypto';
-import fetch from 'node-fetch';
 
-interface LicenseResponse {
-    email: string;
-    licenseKey: string;
-    status: string;
-    maxDevices: number;
-    devices?: string[];
-    error?: string;
-}
 
-// Function to generate a unique device ID
-function getDeviceId(): string {
-    const platform = os.platform();
-    const release = os.release();
-    const arch = os.arch();
-    const cpus = os.cpus();
-    const username = os.userInfo().username;
-    
-    // Create a unique string combining system information
-    const systemInfo = `${platform}-${release}-${arch}-${cpus[0].model}-${username}`;
-    
-    // Create a hash of the system info to use as device ID
-    return crypto.createHash('sha256').update(systemInfo).digest('hex');
-}
 
-// Function to validate license with the backend
-async function validateLicense(context: vscode.ExtensionContext, email: string, licenseKey: string): Promise<boolean> {
-    try {
-        const deviceId = getDeviceId();
-        
-        const response = await fetch('https://vssnippets.com/api/validate-license', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                email,
-                licenseKey,
-                deviceId
-            })
-        });
-
-        const data = await response.json() as LicenseResponse;
-        
-        if (!response.ok) {
-            console.error('License validation failed:', data.error);
-            return false;
-        }
-
-        if (data.status === 'invalid') {
-            console.error('Invalid license key');
-            return false;
-        }
-
-        if (data.status === 'expired') {
-            console.error('License key has expired');
-            return false;
-        }
-
-        if (data.maxDevices > 0 && data.devices && data.devices.length >= data.maxDevices) {
-            console.error('Maximum number of devices reached');
-            return false;
-        }
-
-        // Store the validated state and details
-        await context.globalState.update('vssnippets.licenseValidated', true);
-        await context.globalState.update('vssnippets.licenseKey', licenseKey);
-        await context.globalState.update('vssnippets.email', data.email);
-
-        return true;
-    } catch (error) {
-        console.error('License validation error:', error);
-        vscode.window.showErrorMessage('Failed to connect to license server. Please check your internet connection.');
-        return false;
-    }
-}
-
-async function shouldShowLicenseModal(context: vscode.ExtensionContext): Promise<boolean> {
-    const isLicenseValid = context.globalState.get('vssnippets.licenseValidated');
-    if (isLicenseValid) {
-        return false;
-    }
-
-    const installDate = context.globalState.get<number>('vssnippets.installDate');
-    if (!installDate) {
-        // First time installation
-        await context.globalState.update('vssnippets.installDate', Date.now());
-        return false;
-    }
-
-    const daysSinceInstall = Math.floor((Date.now() - installDate) / (1000 * 60 * 60 * 24));
-    return daysSinceInstall >= 10;
-}
-
-async function showLicenseModal(context: vscode.ExtensionContext) {
-    try {
-        if (!await shouldShowLicenseModal(context)) {
-            return;
-        }
-
-        const message = 'Thank you for using VS Snippets!\nPlease purchase a license for extended use.';
-        const result = await vscode.window.showInformationMessage(
-            message,
-            { modal: true },
-            { title: 'OK', isCloseAffordance: false },
-            { title: 'Enter License Key', isCloseAffordance: false }
-        );
-
-        if (result?.title === 'Enter License Key') {
-            await vscode.commands.executeCommand('snippets.enterLicense');
-        } else if (result?.title === 'OK') {
-            await vscode.commands.executeCommand('vscode.open', vscode.Uri.parse('https://www.vssnippets.com'));
-        }
-    } catch (error: any) {
-        if (!error.message?.includes('Canceled')) {
-            console.error('Error showing license modal:', error);
-        }
-    }
-}
 
 async function showWelcomeMessage(context: vscode.ExtensionContext): Promise<void> {
     try {
@@ -324,8 +208,7 @@ export async function activate(context: vscode.ExtensionContext) {
             })
         );
 
-        // Show license modal if needed
-        await showLicenseModal(context);
+
 
         // Modify the configureBackupFolder command
         let configureBackupFolder = vscode.commands.registerCommand('snippets.configureBackupFolder', async () => {
@@ -409,65 +292,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         });
 
-        // Register the enter license command
-        let enterLicenseCommand = vscode.commands.registerCommand('snippets.enterLicense', async () => {
-            const email = await vscode.window.showInputBox({
-                prompt: 'Please enter your email address',
-                placeHolder: 'email@example.com',
-                validateInput: (value) => {
-                    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? null : 'Please enter a valid email address';
-                }
-            });
 
-            if (!email) {
-                return showLicenseModal(context);
-            }
-
-            const licenseKey = await vscode.window.showInputBox({
-                prompt: 'Please enter your license key',
-                placeHolder: 'XXXX-XXXX-XXXX-XXXX'
-            });
-
-            if (!licenseKey) {
-                return showLicenseModal(context);
-            }
-
-            try {
-                const isValid = await validateLicense(context, email, licenseKey);
-                if (isValid) {
-                    vscode.window.showInformationMessage('License activated successfully! Thank you for your purchase. 🎉');
-                } else {
-                    return showLicenseModal(context);
-                }
-            } catch (error) {
-                console.error('License validation error:', error);
-                vscode.window.showErrorMessage('Failed to validate license. Please try again or contact support.');
-                return showLicenseModal(context);
-            }
-        });
-
-        // Add the remove license command registration
-        let removeLicenseCommand = vscode.commands.registerCommand('snippets.removeLicense', async () => {
-            const confirmed = await vscode.window.showWarningMessage(
-                'Are you sure you want to remove your license? You will need to enter it again to use the full version.',
-                { modal: true },
-                'Remove License',
-                'Cancel'
-            );
-
-            if (confirmed === 'Remove License') {
-                try {
-                    await context.globalState.update('vssnippets.licenseValidated', false);
-                    await context.globalState.update('vssnippets.licenseKey', undefined);
-                    await context.globalState.update('vssnippets.email', undefined);
-                    vscode.window.showInformationMessage('License has been removed successfully.');
-                    await showLicenseModal(context);
-                } catch (error) {
-                    console.error('Error removing license:', error);
-                    vscode.window.showErrorMessage('Failed to remove license. Please try again.');
-                }
-            }
-        });
 
         // Add disposables to context
         context.subscriptions.push(
@@ -479,8 +304,7 @@ export async function activate(context: vscode.ExtensionContext) {
             moveToRootCommand,
             moveUpCommand,
             moveDownCommand,
-            enterLicenseCommand,
-            removeLicenseCommand
+
         );
 
         // Register views
@@ -523,8 +347,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     { label: 'Sync from Backup Folder', command: 'snippets.syncFromBackup' },
                     { label: 'Import Snippets', command: 'snippets.importSnippets' },
                     { label: 'Export Snippets', command: 'snippets.exportSnippets' },
-                    { label: 'Enter License Key', command: 'snippets.enterLicense' },
-                    { label: 'Remove License', command: 'snippets.removeLicense' },
+
                     { label: '$(question) Get Help at vssnippets.com', command: 'snippets.openHelpWebsite' }
                 ];
 
