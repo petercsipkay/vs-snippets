@@ -13,12 +13,12 @@ export class SnippetEditor {
         // Clean up any instance-specific disposables
         this.disposables.forEach(d => d.dispose());
         this.disposables = [];
-        
+
         // Clean up all panels
         SnippetEditor.disposeAll();
     }
 
-    static async show(snippet: { 
+    static async show(snippet: {
         id: string;
         name: string;
         code: string;
@@ -57,7 +57,7 @@ export class SnippetEditor {
         // Handle messages from the webview
         panel.webview.onDidReceiveMessage(async message => {
             console.log('[DEBUG] Received message from webview:', message);
-            
+
             if (message.command === 'save') {
                 try {
                     console.log('[DEBUG] Saving snippet with data:', {
@@ -173,6 +173,9 @@ export class SnippetEditor {
             let currentTags = new Set(${JSON.stringify(snippet.tags || [])});
             let editor;
 
+            // NOTE: We load Monaco Editor from a CDN to avoid bundling the entire editor with the extension.
+            // This requires an internet connection to use the editor.
+            // In a future update, we could bundle it to allow offline usage, but it significantly increases the extension size.
             require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs' }});
             require(['vs/editor/editor.main'], async function() {
                 monaco.editor.defineTheme('vscode-dark', {
@@ -501,11 +504,11 @@ export class SnippetEditor {
                     </div>
                     <select id="language">
                         <option value="">Select a language...</option>
-                        ${languageOptions.map(lang => 
-                            lang.separator 
-                                ? `<option disabled>${lang.label}</option>`
-                                : `<option value="${lang.value}" ${lang.value === snippet.language ? 'selected' : ''}>${lang.label}</option>`
-                        ).join('')}
+                        ${languageOptions.map(lang =>
+            lang.separator
+                ? `<option disabled>${lang.label}</option>`
+                : `<option value="${lang.value}" ${lang.value === snippet.language ? 'selected' : ''}>${lang.label}</option>`
+        ).join('')}
                     </select>
                 </div>
 
@@ -516,9 +519,9 @@ export class SnippetEditor {
                     <label>Tags:</label>
                     <input type="text" id="tag-input" placeholder="Add a tag (press Enter)">
                     <div class="tag-container" id="tag-container">
-                        ${(snippet.tags || []).map(tag => 
-                            `<span class="tag" data-tag="${tag}">${tag}<span class="tag-remove">&times;</span></span>`
-                        ).join('')}
+                        ${(snippet.tags || []).map(tag =>
+            `<span class="tag" data-tag="${tag}">${tag}<span class="tag-remove">&times;</span></span>`
+        ).join('')}
                     </div>
                 </div>
 

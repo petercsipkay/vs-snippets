@@ -75,16 +75,16 @@ async function autoSyncFromBackup(context: vscode.ExtensionContext, localStorage
     try {
         const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
         if (!backupFolder) {
-            console.log('[DEBUG] No backup folder configured, skipping auto-sync');
+
             return;
         }
 
         const backupPath = path.join(backupFolder, 'snippets.json');
-        console.log('[DEBUG] Checking for backup file at:', backupPath);
+
 
         // Check if backup file exists
         if (!await fileExists(backupPath)) {
-            console.log('[DEBUG] No backup file found at:', backupPath);
+
             return;
         }
 
@@ -97,11 +97,11 @@ async function autoSyncFromBackup(context: vscode.ExtensionContext, localStorage
 
         // Only sync if backup is newer than last sync
         if (backupModified <= lastSync) {
-            console.log('[DEBUG] Backup file not modified since last sync');
+
             return;
         }
 
-        console.log('[DEBUG] Reading backup file for auto-sync');
+
         const content = await fs.promises.readFile(backupPath, 'utf8');
         const importedData = JSON.parse(content);
 
@@ -109,7 +109,7 @@ async function autoSyncFromBackup(context: vscode.ExtensionContext, localStorage
         let snippets: any[] = [];
 
         if (importedData.version === "1.0" && Array.isArray(importedData.data)) {
-            console.log('[DEBUG] Processing version 1.0 format for auto-sync');
+
             importedData.data.forEach((item: any) => {
                 if (item.type === 'folder') {
                     const { type, ...folderData } = item;
@@ -127,10 +127,7 @@ async function autoSyncFromBackup(context: vscode.ExtensionContext, localStorage
         const mergedFolders = mergeFolders(currentData.folders, folders);
         const mergedSnippets = mergeSnippets(currentData.snippets, snippets);
 
-        console.log('[DEBUG] Auto-sync - Merged data:', {
-            folders: mergedFolders.length,
-            snippets: mergedSnippets.length
-        });
+
 
         // Sync the merged data
         await localStorage.syncData({
@@ -144,7 +141,7 @@ async function autoSyncFromBackup(context: vscode.ExtensionContext, localStorage
         // Refresh the tree view
         await treeDataProvider.refresh();
 
-        console.log('[DEBUG] Auto-sync completed successfully');
+
     } catch (error) {
         console.error('[DEBUG] Auto-sync error:', error);
         // Don't show error message to user during auto-sync
@@ -163,13 +160,13 @@ function watchBackupFile(context: vscode.ExtensionContext, localStorage: LocalSt
 
     // Watch for changes to the backup file
     watcher.onDidChange(async () => {
-        console.log('[DEBUG] Backup file changed, triggering sync');
+
         await autoSyncFromBackup(context, localStorage, treeDataProvider);
     });
 
     // Watch for creation of the backup file
     watcher.onDidCreate(async () => {
-        console.log('[DEBUG] Backup file created, triggering sync');
+
         await autoSyncFromBackup(context, localStorage, treeDataProvider);
     });
 
@@ -198,7 +195,7 @@ export async function activate(context: vscode.ExtensionContext) {
         context.subscriptions.push(
             vscode.workspace.onDidChangeConfiguration(async e => {
                 if (e.affectsConfiguration('snippets.backupFolder')) {
-                    console.log('[DEBUG] Backup folder configuration changed');
+
                     const watcher = watchBackupFile(context, localStorage, treeDataProvider);
                     if (watcher) {
                         context.subscriptions.push(watcher);
@@ -524,7 +521,7 @@ export async function activate(context: vscode.ExtensionContext) {
                         const content = await fs.promises.readFile(result[0].fsPath, 'utf8');
                         const data = JSON.parse(content);
 
-                        console.log('[DEBUG] Import - Parsed file content:', data);
+
 
                         let folders: any[] = [];
                         let snippets: any[] = [];
@@ -542,10 +539,7 @@ export async function activate(context: vscode.ExtensionContext) {
                             });
                         }
 
-                        console.log('[DEBUG] Import - Processed data:', {
-                            folders: folders.length,
-                            snippets: snippets.length
-                        });
+
 
                         // Get current data
                         const currentData = await localStorage.getAllData();
@@ -554,10 +548,7 @@ export async function activate(context: vscode.ExtensionContext) {
                         const mergedFolders = mergeFolders(currentData.folders, folders);
                         const mergedSnippets = mergeSnippets(currentData.snippets, snippets);
 
-                        console.log('[DEBUG] Import - Final data:', {
-                            folders: mergedFolders.length,
-                            snippets: mergedSnippets.length
-                        });
+
 
                         // Sync the merged data
                         await localStorage.syncData({
@@ -568,7 +559,7 @@ export async function activate(context: vscode.ExtensionContext) {
                         treeDataProvider.refresh();
                         vscode.window.showInformationMessage('Snippets imported successfully');
                     } catch (error) {
-                        console.error('[DEBUG] Import error:', error);
+                        console.error('Import error:', error);
                         vscode.window.showErrorMessage('Failed to import snippets: ' + error);
                     }
                 }
@@ -606,7 +597,7 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.commands.registerCommand('snippets.syncFromBackup', async () => {
                 try {
                     const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
-                    console.log('[DEBUG] Attempting to sync from backup folder:', backupFolder);
+
 
                     if (!backupFolder) {
                         const result = await vscode.window.showWarningMessage(
@@ -637,21 +628,21 @@ export async function activate(context: vscode.ExtensionContext) {
                     }
 
                     const filePath = fileUri[0].fsPath;
-                    console.log('[DEBUG] Selected file:', filePath);
+
 
                     // Read and parse the file
                     const content = await fs.promises.readFile(filePath, 'utf8');
-                    console.log('[DEBUG] Raw file content:', content);
+
 
                     const importedData = JSON.parse(content);
-                    console.log('[DEBUG] Parsed file content:', JSON.stringify(importedData, null, 2));
+
 
                     let folders: any[] = [];
                     let snippets: any[] = [];
 
                     // Handle version 1.0 format (which is what we have in the backup)
                     if (importedData.version === "1.0" && Array.isArray(importedData.data)) {
-                        console.log('[DEBUG] Processing version 1.0 format');
+
                         importedData.data.forEach((item: any) => {
                             if (item.type === 'folder') {
                                 // For folders, remove the type field but keep everything else
@@ -662,7 +653,7 @@ export async function activate(context: vscode.ExtensionContext) {
                                     parentId: folderData.parentId,
                                     lastModified: folderData.lastModified
                                 });
-                                console.log('[DEBUG] Added folder:', folderData);
+
                             } else {
                                 // For snippets, keep all fields
                                 snippets.push({
@@ -675,17 +666,12 @@ export async function activate(context: vscode.ExtensionContext) {
                                     tags: item.tags || [],
                                     lastModified: item.lastModified
                                 });
-                                console.log('[DEBUG] Added snippet:', item);
+
                             }
                         });
                     }
 
-                    console.log('[DEBUG] Processed data:', {
-                        folders: folders.length,
-                        snippets: snippets.length,
-                        folderDetails: folders,
-                        snippetDetails: snippets
-                    });
+
 
                     if (folders.length === 0 && snippets.length === 0) {
                         vscode.window.showErrorMessage('No valid data found in the backup file');
@@ -701,7 +687,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
                     if (confirmResult === 'Sync') {
                         // Save the data directly
-                        console.log('[DEBUG] Saving data to storage');
+
                         await localStorage.syncData({
                             folders: folders,
                             snippets: snippets
@@ -709,12 +695,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
                         // Verify the save
                         const verifyData = await localStorage.getAllData();
-                        console.log('[DEBUG] Verified saved data:', {
-                            folders: verifyData.folders.length,
-                            snippets: verifyData.snippets.length,
-                            folderDetails: verifyData.folders,
-                            snippetDetails: verifyData.snippets
-                        });
+
 
                         // Force refresh
                         await treeDataProvider.refresh();
@@ -743,7 +724,7 @@ export function deactivate() {
 async function syncFromBackupFolder(localStorage: LocalStorage, treeDataProvider: SnippetTreeDataProvider): Promise<void> {
     try {
         const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
-        console.log('[DEBUG] Attempting to sync from backup folder:', backupFolder);
+
 
         if (!backupFolder) {
             const result = await vscode.window.showWarningMessage(
@@ -776,13 +757,13 @@ async function syncFromBackupFolder(localStorage: LocalStorage, treeDataProvider
         }
 
         const filePath = fileUri[0].fsPath;
-        console.log('[DEBUG] Selected file:', filePath);
+
 
         try {
             const content = await fs.promises.readFile(filePath, 'utf8');
             const importedData = JSON.parse(content);
 
-            console.log('[DEBUG] Parsed file content:', importedData);
+
 
             let folders: any[] = [];
             let snippets: any[] = [];
