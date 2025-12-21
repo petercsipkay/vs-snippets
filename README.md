@@ -58,9 +58,6 @@ See VS Snippets in action:
 
 Need help? We're here for you:
 
--   📧 Email: support@vssnippets.com
--   🌐 Website: [vssnippets.com](https://vssnippets.com)
--   📚 Documentation: [vssnippets.com/docs](https://vssnippets.com/docs)
 -   🐛 Report Issues: [GitHub Issues](https://github.com/csipkay/snippy-snippets/issues)
 
 ## Installation

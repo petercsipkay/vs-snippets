@@ -14,7 +14,7 @@ async function showWelcomeMessage(context: vscode.ExtensionContext): Promise<voi
     try {
         const hasShownWelcome = context.globalState.get('snippets.hasShownWelcome');
         const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
-        
+
         if (!hasShownWelcome || !backupFolder) {
             const message = 'Welcome to VS Snippets! 🎉\n\n' +
                 'To get started and enable cross-device sync:\n\n' +
@@ -24,7 +24,7 @@ async function showWelcomeMessage(context: vscode.ExtensionContext): Promise<voi
                 '   Use the sidebar to organize and manage your snippets\n\n' +
                 '3. Access them from any computer\n' +
                 '   Your snippets will automatically sync when you open VS Code';
-            
+
             const result = await vscode.window.showInformationMessage(
                 message,
                 { modal: true, detail: 'Choose a cloud storage folder (like Dropbox or Google Drive) to enable cross-device sync.' },
@@ -44,16 +44,16 @@ async function showWelcomeMessage(context: vscode.ExtensionContext): Promise<voi
                 const folderResult = await vscode.window.showOpenDialog(options);
                 if (folderResult && folderResult[0]) {
                     const folderPath = folderResult[0].fsPath;
-                    
+
                     // Save the backup folder path to settings
                     await vscode.workspace.getConfiguration('snippets').update('backupFolder', folderPath, vscode.ConfigurationTarget.Global);
-                    
+
                     // Create snippets.json if it doesn't exist
                     const backupPath = path.join(folderPath, 'snippets.json');
                     if (!await fileExists(backupPath)) {
                         await fs.promises.writeFile(backupPath, JSON.stringify({ version: "1.0", data: [] }));
                     }
-                    
+
                     vscode.window.showInformationMessage(
                         `Backup folder set to: ${folderPath}\n\nTip: To sync between computers, choose a folder in your cloud storage (Dropbox, Google Drive, etc).`
                     );
@@ -90,7 +90,7 @@ async function autoSyncFromBackup(context: vscode.ExtensionContext, localStorage
 
         // Get last sync timestamp
         const lastSync = context.globalState.get<number>('vssnippets.lastSync') || 0;
-        
+
         // Get backup file stats
         const stats = await fs.promises.stat(backupPath);
         const backupModified = stats.mtimeMs;
@@ -140,10 +140,10 @@ async function autoSyncFromBackup(context: vscode.ExtensionContext, localStorage
 
         // Update last sync timestamp
         await context.globalState.update('vssnippets.lastSync', Date.now());
-        
+
         // Refresh the tree view
         await treeDataProvider.refresh();
-        
+
         console.log('[DEBUG] Auto-sync completed successfully');
     } catch (error) {
         console.error('[DEBUG] Auto-sync error:', error);
@@ -223,16 +223,16 @@ export async function activate(context: vscode.ExtensionContext) {
             const result = await vscode.window.showOpenDialog(options);
             if (result && result[0]) {
                 const folderPath = result[0].fsPath;
-                
+
                 // Save the backup folder path to settings
                 await vscode.workspace.getConfiguration('snippets').update('backupFolder', folderPath, vscode.ConfigurationTarget.Global);
-                
+
                 // Create snippets.json if it doesn't exist
                 const backupPath = path.join(folderPath, 'snippets.json');
                 if (!await fileExists(backupPath)) {
                     await fs.promises.writeFile(backupPath, JSON.stringify({ version: "1.0", data: [] }));
                 }
-                
+
                 vscode.window.showInformationMessage(
                     `Backup folder set to: ${folderPath}\n\nTip: To sync between computers, choose a folder in your cloud storage (Dropbox, Google Drive, etc).`
                 );
@@ -248,10 +248,7 @@ export async function activate(context: vscode.ExtensionContext) {
             }
         });
 
-        // Register help website command
-        let openHelpWebsite = vscode.commands.registerCommand('snippets.openHelpWebsite', () => {
-            vscode.env.openExternal(vscode.Uri.parse('https://vssnippets.com'));
-        });
+
 
         // Register the moveToRoot command
         let moveToRootCommand = vscode.commands.registerCommand('snippets.moveToRoot', async (item: SnippetTreeItem) => {
@@ -300,7 +297,7 @@ export async function activate(context: vscode.ExtensionContext) {
             treeDataProvider,
             snippetEditor,
             configureBackupFolder,
-            openHelpWebsite,
+
             moveToRootCommand,
             moveUpCommand,
             moveDownCommand,
@@ -348,7 +345,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     { label: 'Import Snippets', command: 'snippets.importSnippets' },
                     { label: 'Export Snippets', command: 'snippets.exportSnippets' },
 
-                    { label: '$(question) Get Help at vssnippets.com', command: 'snippets.openHelpWebsite' }
+
                 ];
 
                 const selected = await vscode.window.showQuickPick(items, {
@@ -486,8 +483,8 @@ export async function activate(context: vscode.ExtensionContext) {
                     return;
                 }
 
-                const confirmMessage = item.type === 'folder' 
-                    ? 'Are you sure you want to delete this folder and all its snippets?' 
+                const confirmMessage = item.type === 'folder'
+                    ? 'Are you sure you want to delete this folder and all its snippets?'
                     : 'Are you sure you want to delete this snippet?';
 
                 const confirmed = await vscode.window.showWarningMessage(
@@ -610,7 +607,7 @@ export async function activate(context: vscode.ExtensionContext) {
                 try {
                     const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
                     console.log('[DEBUG] Attempting to sync from backup folder:', backupFolder);
-                    
+
                     if (!backupFolder) {
                         const result = await vscode.window.showWarningMessage(
                             'Backup folder not configured. Would you like to configure it now?',
@@ -645,7 +642,7 @@ export async function activate(context: vscode.ExtensionContext) {
                     // Read and parse the file
                     const content = await fs.promises.readFile(filePath, 'utf8');
                     console.log('[DEBUG] Raw file content:', content);
-                    
+
                     const importedData = JSON.parse(content);
                     console.log('[DEBUG] Parsed file content:', JSON.stringify(importedData, null, 2));
 
@@ -747,7 +744,7 @@ async function syncFromBackupFolder(localStorage: LocalStorage, treeDataProvider
     try {
         const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
         console.log('[DEBUG] Attempting to sync from backup folder:', backupFolder);
-        
+
         if (!backupFolder) {
             const result = await vscode.window.showWarningMessage(
                 'Backup folder not configured. Would you like to configure it now?',
@@ -835,7 +832,7 @@ async function syncFromBackupFolder(localStorage: LocalStorage, treeDataProvider
                 folders: mergedFolders,
                 snippets: mergedSnippets
             });
-            
+
             treeDataProvider.refresh();
             vscode.window.showInformationMessage('Successfully synced snippets from selected file');
         } catch (error) {
@@ -852,7 +849,7 @@ async function syncFromBackupFolder(localStorage: LocalStorage, treeDataProvider
 // Helper function to merge folders arrays while preserving unique IDs and using timestamps
 function mergeFolders(existing: any[], newFolders: any[]): any[] {
     const folderMap = new Map();
-    
+
     // Add existing folders to map
     existing.forEach(folder => {
         folderMap.set(folder.id, {
@@ -868,7 +865,7 @@ function mergeFolders(existing: any[], newFolders: any[]): any[] {
             ...folder,
             lastModified: folder.lastModified || Date.now() // Add timestamp if missing
         };
-        
+
         if (!existingFolder || (newFolder.lastModified > existingFolder.lastModified)) {
             folderMap.set(folder.id, newFolder);
         }
@@ -880,7 +877,7 @@ function mergeFolders(existing: any[], newFolders: any[]): any[] {
 // Helper function to merge snippets arrays while preserving unique IDs and using timestamps
 function mergeSnippets(existing: any[], newSnippets: any[]): any[] {
     const snippetMap = new Map();
-    
+
     // Add existing snippets to map
     existing.forEach(snippet => {
         snippetMap.set(snippet.id, {
@@ -896,7 +893,7 @@ function mergeSnippets(existing: any[], newSnippets: any[]): any[] {
             ...snippet,
             lastModified: snippet.lastModified || Date.now() // Add timestamp if missing
         };
-        
+
         if (!existingSnippet || (newSnippet.lastModified > existingSnippet.lastModified)) {
             snippetMap.set(snippet.id, newSnippet);
         }

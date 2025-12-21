@@ -4,15 +4,6 @@
     "description": "✨ Professional Code Snippets Manager for VS Code - Supercharge your productivity with organized code snippets",
     "version": "1.0.3",
     "publisher": "petercsipkay",
-    "website": "https://vssnippets.com",
-    "icon": "resources/logo.png",
-    "bugs": {
-        "url": "https://github.com/petercsipkay/vssnippetscom/issues"
-    },
-    "homepage": "https://vssnippets.com",
-    "author": {
-        "name": "Peter Csipkay"
-    },
     "license": "MIT",
     "engines": {
         "vscode": "^1.87.0"
@@ -213,11 +204,6 @@
             {
                 "command": "snippets.configureBackupFolder",
                 "title": "Configure Backup Folder",
-                "category": "VS Snippets"
-            },
-            {
-                "command": "snippets.openHelpWebsite",
-                "title": "Get Help at vssnippets.com",
                 "category": "VS Snippets"
             },
             {
