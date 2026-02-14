@@ -21,4 +21,5 @@ webpack.config.js
 .prettierignore
 .eslintignore
 yarn.lock
-package-lock.json MARKETPLACE_MANAGEMENT.md
+package-lock.json
+MARKETPLACE_MANAGEMENT.md

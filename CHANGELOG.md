@@ -1,5 +1,8 @@
 # Change Log
 
+## [1.0.10] - 2026-02-14
+- 🛠️ Properly excluded management files from production bundle.
+
 ## [1.0.9] - 2026-02-14
 - 🛠️ Fixed marketplace publishing issue.
 - 🧹 Ensured internal management files are excluded from the extension bundle.
