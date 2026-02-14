@@ -2,7 +2,7 @@
     "name": "vs-snippets",
     "displayName": "VS Snippets - Snippet Manager",
     "description": "Organize, search, and sync code snippets in VS Code with folders, tags, and cloud backup.",
-    "version": "1.0.10",
+    "version": "1.0.11",
     "publisher": "petercsipkay",
     "repository": {
         "type": "git",

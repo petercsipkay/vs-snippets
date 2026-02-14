@@ -2,7 +2,7 @@
 
 VS Snippets helps you save, organize, search, and sync reusable code snippets inside VS Code.
 
-![VS Snippets Preview](https://github.com/petercsipkay/vs-snippets/blob/main/resources/Preview.png?raw=1)
+<img src="https://petercsipkay.s3.eu-north-1.amazonaws.com/vssnippets.png" alt="VS Snippets Preview" width="900" />
 
 Best for developers who want to:
 

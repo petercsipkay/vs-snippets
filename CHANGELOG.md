@@ -1,5 +1,8 @@
 # Change Log
 
+## [1.0.11] - 2026-02-14
+- 🖼️ Updated preview image to use a more reliable host for the marketplace.
+
 ## [1.0.10] - 2026-02-14
 - 🛠️ Properly excluded management files from production bundle.
 
