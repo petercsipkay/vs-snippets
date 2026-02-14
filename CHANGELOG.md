@@ -1,5 +1,9 @@
 # Change Log
 
+## [1.0.9] - 2026-02-14
+- 🛠️ Fixed marketplace publishing issue.
+- 🧹 Ensured internal management files are excluded from the extension bundle.
+
 ## [1.0.8] - 2026-02-14
 - ✨ Refreshed extension metadata (Display Name, Description, and Keywords) for better searchability.
 - 🖼️ Added new preview image to README.
