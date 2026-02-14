@@ -58,7 +58,7 @@ See VS Snippets in action:
 
 Need help? We're here for you:
 
--   🐛 Report Issues: [GitHub Issues](https://github.com/csipkay/snippy-snippets/issues)
+-   🐛 Report Issues: [GitHub Issues](https://github.com/petercsipkay/snippy/issues)
 
 ## Installation
 
