@@ -2,7 +2,7 @@
     "name": "vs-snippets",
     "displayName": "VS Snippets - Code Snippets Manager",
     "description": "✨ Professional Code Snippets Manager for VS Code - Supercharge your productivity with organized code snippets",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "publisher": "petercsipkay",
     "repository": {
         "type": "git",

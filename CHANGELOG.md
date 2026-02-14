@@ -1,5 +1,8 @@
 # Change Log
 
+## [1.0.7] - 2026-02-14
+- 🧹 Removed broken YouTube demo and Cloudinary images from README for a cleaner presentation.
+
 ## [1.0.6] - 2026-02-14
 - 🔗 Updated repository and bug tracker links to the new public repository: `github.com/petercsipkay/vs-snippets`.
 

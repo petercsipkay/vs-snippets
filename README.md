@@ -13,18 +13,6 @@ Perfect for developers who want to:
 
 Works seamlessly with VS Code and all VS Code-based editors including VSCodium, GitPod, and GitHub Codespaces. Features local backup support and cloud sync capabilities to keep your snippets safe and accessible everywhere.
 
-## Quick Demo
-
-📺 [Watch the full video tutorial on YouTube](https://www.youtube.com/watch?v=Dveo_WSv2rI)
-
-See VS Snippets in action:
-
-![VS Snippets Demo](https://res.cloudinary.com/doy6thjn1/image/upload/v1740520101/vssnippets/Code_lmyekp.gif)
-
-## Overview
-
-![VS Snippets Preview](https://res.cloudinary.com/doy6thjn1/image/upload/v1740307026/vssnippets/preview_oah8xi.png)
-
 ## Features
 
 -   📝 Create and organize code snippets with a modern editor
