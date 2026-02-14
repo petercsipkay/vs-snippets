@@ -1,5 +1,11 @@
 # Change Log
 
+## [1.0.8] - 2026-02-14
+- ✨ Refreshed extension metadata (Display Name, Description, and Keywords) for better searchability.
+- 🖼️ Added new preview image to README.
+- 📝 Streamlined README with a faster "30-second setup" guide.
+- 💬 Added support guide link.
+
 ## [1.0.7] - 2026-02-14
 - 🧹 Removed broken YouTube demo and Cloudinary images from README for a cleaner presentation.
 
