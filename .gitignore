@@ -128,3 +128,6 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Marketplace credentials
+MARKETPLACE_MANAGEMENT.md
