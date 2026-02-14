@@ -95,6 +95,13 @@ export class SnippetEditor {
         language?: string;
         tags?: string[];
     }): Promise<string> {
+        const safeName = this.escapeHtml(snippet.name);
+        const safeNotes = this.escapeHtml(snippet.notes || '');
+        const safeTags = (snippet.tags || []).map(tag => {
+            const escapedTag = this.escapeHtml(tag);
+            return `<span class="tag" data-tag="${escapedTag}">${escapedTag}<span class="tag-remove">&times;</span></span>`;
+        }).join('');
+
         // Language options for the dropdown
         const languageOptions = [
             // Popular Languages
@@ -338,7 +345,11 @@ export class SnippetEditor {
                             const tagElement = document.createElement('span');
                             tagElement.className = 'tag';
                             tagElement.dataset.tag = tag;
-                            tagElement.innerHTML = tag + '<span class="tag-remove">&times;</span>';
+                            tagElement.textContent = tag;
+                            const removeButton = document.createElement('span');
+                            removeButton.className = 'tag-remove';
+                            removeButton.innerHTML = '&times;';
+                            tagElement.appendChild(removeButton);
                             tagContainer.appendChild(tagElement);
                             this.value = '';
                             handleChange();
@@ -500,7 +511,7 @@ export class SnippetEditor {
             <body>
                 <div class="header">
                     <div class="header-title">
-                        <h2>${snippet.name}</h2>
+                        <h2>${safeName}</h2>
                     </div>
                     <select id="language">
                         <option value="">Select a language...</option>
@@ -514,14 +525,12 @@ export class SnippetEditor {
 
                 <div class="top-section">
                     <label>Notes:</label>
-                    <textarea id="notes" rows="3">${snippet.notes || ''}</textarea>
+                    <textarea id="notes" rows="3">${safeNotes}</textarea>
 
                     <label>Tags:</label>
                     <input type="text" id="tag-input" placeholder="Add a tag (press Enter)">
                     <div class="tag-container" id="tag-container">
-                        ${(snippet.tags || []).map(tag =>
-            `<span class="tag" data-tag="${tag}">${tag}<span class="tag-remove">&times;</span></span>`
-        ).join('')}
+                        ${safeTags}
                     </div>
                 </div>
 
@@ -533,6 +542,15 @@ export class SnippetEditor {
                 <script>${editorScript}</script>
             </body>
         </html>`;
+    }
+
+    private static escapeHtml(value: string): string {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     static disposeAll() {

@@ -1,17 +1,20 @@
-# VS Code Snippets Manager - VS Snippets
+# VS Snippets - Snippet Manager for VS Code
 
-Supercharge your coding workflow with VS Snippets, a powerful, user-friendly, and **completely free** code snippet manager for VS Code. Save and organize your frequently used code snippets with support for 40+ programming languages including JavaScript, Python, Java, C++, Rust, TypeScript, Go, and many more.
+VS Snippets helps you save, organize, search, and sync reusable code snippets inside VS Code.
 
+![VS Snippets Preview](https://github.com/petercsipkay/vs-snippets/blob/main/resources/Preview.png?raw=1)
 
+Best for developers who want to:
 
-Perfect for developers who want to:
+-   Reuse common code patterns faster
+-   Keep snippets structured with folders, notes, and tags
+-   Sync snippets across machines with cloud-backed folders
 
--   Save time by reusing common code patterns
--   Keep code snippets organized and easily searchable
--   Share snippets across multiple projects and devices
--   Maintain a personal code library with smart categorization
+### 30-second setup
 
-Works seamlessly with VS Code and all VS Code-based editors including VSCodium, GitPod, and GitHub Codespaces. Features local backup support and cloud sync capabilities to keep your snippets safe and accessible everywhere.
+1. Install **VS Snippets** from VS Code Marketplace.
+2. Create your first folder and snippet from the sidebar.
+3. (Optional) Configure a backup folder for cross-device sync.
 
 ## Features
 
@@ -47,6 +50,7 @@ Works seamlessly with VS Code and all VS Code-based editors including VSCodium, 
 Need help? We're here for you:
 
 -   🐛 Report Issues: [GitHub Issues](https://github.com/petercsipkay/vs-snippets/issues)
+-   💬 Support Guide: [SUPPORT.md](./SUPPORT.md)
 
 ## Installation
 
