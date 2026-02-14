@@ -1,5 +1,8 @@
 # Change Log
 
+## [1.0.6] - 2026-02-14
+- 🔗 Updated repository and bug tracker links to the new public repository: `github.com/petercsipkay/vs-snippets`.
+
 ## [1.0.5] - 2026-02-14
 - 🛠️ Fixed GitHub issues link in README.
 - 📦 Initial automated publish with new management process.
