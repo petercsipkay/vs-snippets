@@ -1,5 +1,10 @@
 # Change Log
 
+## [1.0.12] - 2026-05-19
+- ✨ Added duplicate, copy-to-clipboard, insert into editor, and pin/unpin actions for snippets.
+- 🛠️ Improved welcome dialog behavior and routed extension logs to a dedicated Output Channel.
+- 🔧 Kept backup folder settings machine-scoped so per-device paths are not overwritten by Settings Sync.
+
 ## [1.0.11] - 2026-02-14
 - 🖼️ Updated preview image to use a more reliable host for the marketplace.
 
