@@ -11,10 +11,10 @@ export class SnippetTreeItem extends vscode.TreeItem {
         public readonly id: string,
         public readonly type: 'folder' | 'snippet',
         public readonly parentId: string | null = null,
-        public readonly language?: string
+        public readonly language?: string,
+        public readonly pinned?: boolean
     ) {
-        // Always use Collapsed state for folders
-        const collapsibleState = type === 'folder' 
+        const collapsibleState = type === 'folder'
             ? vscode.TreeItemCollapsibleState.Collapsed
             : vscode.TreeItemCollapsibleState.None;
 
@@ -22,11 +22,13 @@ export class SnippetTreeItem extends vscode.TreeItem {
 
         this.tooltip = type === 'folder' ? `Folder: ${label}` : label;
 
-        // Set the contextValue based on whether it's a root folder or subfolder
         if (type === 'folder') {
             this.contextValue = parentId ? 'subfolder' : 'folder';
         } else {
-            this.contextValue = 'snippet';
+            this.contextValue = pinned ? 'pinnedSnippet' : 'snippet';
+            if (pinned) {
+                this.description = '★';
+            }
         }
 
         // Enable drag for snippets and folders, but only allow dropping on folders

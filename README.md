@@ -49,6 +49,7 @@ Best for developers who want to:
 
 Need help? We're here for you:
 
+-   📧 Direct Contact: [hello@petercsipkay.com](mailto:hello@petercsipkay.com) — for problems or feature requests
 -   🐛 Report Issues: [GitHub Issues](https://github.com/petercsipkay/vs-snippets/issues)
 -   💬 Support Guide: [SUPPORT.md](./SUPPORT.md)
 
