@@ -14,6 +14,7 @@ export interface Snippet {
     code: string;
     language: string;
     notes: string;
-    tags?: string[];  // Optional array of tags
-    lastModified: number;  // Unix timestamp in milliseconds
+    tags?: string[];
+    lastModified: number;
+    pinned?: boolean;
 } 

@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import { SnippetTreeItem } from './sidebar/SnippetTreeItem';
 import * as path from 'path';
 import * as os from 'os';
+import { log, logError, showLog } from './logger';
 
 
 
@@ -13,9 +14,8 @@ import * as os from 'os';
 async function showWelcomeMessage(context: vscode.ExtensionContext): Promise<void> {
     try {
         const hasShownWelcome = context.globalState.get('snippets.hasShownWelcome');
-        const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
 
-        if (!hasShownWelcome || !backupFolder) {
+        if (!hasShownWelcome) {
             const message = 'Welcome to VS Snippets! 🎉\n\n' +
                 'To get started and enable cross-device sync:\n\n' +
                 '1. Configure a backup folder (recommended: use Dropbox/Google Drive)\n' +
@@ -32,6 +32,9 @@ async function showWelcomeMessage(context: vscode.ExtensionContext): Promise<voi
                 'Configure Later'
             );
 
+            // Always dismiss the welcome dialog after first interaction
+            await context.globalState.update('snippets.hasShownWelcome', true);
+
             if (result === 'Configure Backup Folder') {
                 const options: vscode.OpenDialogOptions = {
                     canSelectFiles: false,
@@ -45,10 +48,8 @@ async function showWelcomeMessage(context: vscode.ExtensionContext): Promise<voi
                 if (folderResult && folderResult[0]) {
                     const folderPath = folderResult[0].fsPath;
 
-                    // Save the backup folder path to settings
                     await vscode.workspace.getConfiguration('snippets').update('backupFolder', folderPath, vscode.ConfigurationTarget.Global);
 
-                    // Create snippets.json if it doesn't exist
                     const backupPath = path.join(folderPath, 'snippets.json');
                     if (!await fileExists(backupPath)) {
                         await fs.promises.writeFile(backupPath, JSON.stringify({ version: "1.0", data: [] }));
@@ -57,16 +58,12 @@ async function showWelcomeMessage(context: vscode.ExtensionContext): Promise<voi
                     vscode.window.showInformationMessage(
                         `Backup folder set to: ${folderPath}\n\nTip: To sync between computers, choose a folder in your cloud storage (Dropbox, Google Drive, etc).`
                     );
-
-                    // Mark welcome as shown since they configured the backup
-                    await context.globalState.update('snippets.hasShownWelcome', true);
                 }
             }
         }
     } catch (error: any) {
-        // Only log real errors, ignore cancellation
         if (error.name !== 'Canceled') {
-            console.error('Error showing welcome message:', error);
+            logError('Error showing welcome message', error);
         }
     }
 }
@@ -143,8 +140,7 @@ async function autoSyncFromBackup(context: vscode.ExtensionContext, localStorage
 
 
     } catch (error) {
-        console.error('[DEBUG] Auto-sync error:', error);
-        // Don't show error message to user during auto-sync
+        logError('Auto-sync error', error);
     }
 }
 
@@ -288,18 +284,53 @@ export async function activate(context: vscode.ExtensionContext) {
 
 
 
-        // Add disposables to context
-        context.subscriptions.push(
-            localStorage,
-            treeDataProvider,
-            snippetEditor,
-            configureBackupFolder,
+        const showLogCommand = vscode.commands.registerCommand('snippets.showLog', () => showLog());
 
-            moveToRootCommand,
-            moveUpCommand,
-            moveDownCommand,
+        const duplicateSnippetCommand = vscode.commands.registerCommand('snippets.duplicateSnippet', async (item: SnippetTreeItem) => {
+            try {
+                await localStorage.duplicateSnippet(item.id);
+                treeDataProvider.refresh();
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to duplicate snippet: ' + error);
+            }
+        });
 
-        );
+        const copyToClipboardCommand = vscode.commands.registerCommand('snippets.copyToClipboard', async (item: SnippetTreeItem) => {
+            try {
+                const snippet = await localStorage.getSnippet(item.id);
+                if (snippet) {
+                    await vscode.env.clipboard.writeText(snippet.code);
+                    vscode.window.showInformationMessage(`Copied "${snippet.name}" to clipboard`);
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to copy snippet: ' + error);
+            }
+        });
+
+        const insertSnippetCommand = vscode.commands.registerCommand('snippets.insertSnippet', async (item: SnippetTreeItem) => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showErrorMessage('No active editor — open a file first, then insert the snippet.');
+                return;
+            }
+            try {
+                const snippet = await localStorage.getSnippet(item.id);
+                if (snippet) {
+                    await editor.insertSnippet(new vscode.SnippetString(snippet.code));
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to insert snippet: ' + error);
+            }
+        });
+
+        const togglePinCommand = vscode.commands.registerCommand('snippets.togglePin', async (item: SnippetTreeItem) => {
+            try {
+                await localStorage.togglePinSnippet(item.id);
+                treeDataProvider.refresh();
+            } catch (error) {
+                vscode.window.showErrorMessage('Failed to toggle pin: ' + error);
+            }
+        });
 
         // Register views
         const treeView = vscode.window.createTreeView('snippetsExplorer', {
@@ -559,7 +590,7 @@ export async function activate(context: vscode.ExtensionContext) {
                         treeDataProvider.refresh();
                         vscode.window.showInformationMessage('Snippets imported successfully');
                     } catch (error) {
-                        console.error('Import error:', error);
+                        logError('Import error', error);
                         vscode.window.showErrorMessage('Failed to import snippets: ' + error);
                     }
                 }
@@ -702,7 +733,7 @@ export async function activate(context: vscode.ExtensionContext) {
                         vscode.window.showInformationMessage('Successfully synced snippets from backup');
                     }
                 } catch (error) {
-                    console.error('[DEBUG] Sync error:', error);
+                    logError('Sync error', error);
                     vscode.window.showErrorMessage('Failed to sync from backup: ' + error);
                 }
             }),
@@ -710,9 +741,20 @@ export async function activate(context: vscode.ExtensionContext) {
             treeView
         ];
 
-        context.subscriptions.push(...disposables);
+        context.subscriptions.push(
+            ...disposables,
+            configureBackupFolder,
+            moveToRootCommand,
+            moveUpCommand,
+            moveDownCommand,
+            showLogCommand,
+            duplicateSnippetCommand,
+            copyToClipboardCommand,
+            insertSnippetCommand,
+            togglePinCommand
+        );
     } catch (error) {
-        console.error('Error during activation:', error);
+        logError('Error during activation', error);
     }
 }
 
@@ -791,10 +833,7 @@ async function syncFromBackupFolder(localStorage: LocalStorage, treeDataProvider
                 });
             }
 
-            console.log('[DEBUG] Processed data:', {
-                folders: folders.length,
-                snippets: snippets.length
-            });
+            log(`Processed data: ${folders.length} folders, ${snippets.length} snippets`);
 
             // Get current data
             const currentData = await localStorage.getAllData();
@@ -803,10 +842,7 @@ async function syncFromBackupFolder(localStorage: LocalStorage, treeDataProvider
             const mergedFolders = mergeFolders(currentData.folders, folders);
             const mergedSnippets = mergeSnippets(currentData.snippets, snippets);
 
-            console.log('[DEBUG] Merged data:', {
-                folders: mergedFolders.length,
-                snippets: mergedSnippets.length
-            });
+        log(`Merged data: ${mergedFolders.length} folders, ${mergedSnippets.length} snippets`);
 
             // Sync the merged data
             await localStorage.syncData({
@@ -817,12 +853,12 @@ async function syncFromBackupFolder(localStorage: LocalStorage, treeDataProvider
             treeDataProvider.refresh();
             vscode.window.showInformationMessage('Successfully synced snippets from selected file');
         } catch (error) {
-            console.error('[DEBUG] Error reading/parsing file:', error);
+            logError('Error reading/parsing file', error);
             vscode.window.showErrorMessage('Failed to read or parse the selected file');
             return;
         }
     } catch (error) {
-        console.error('[DEBUG] Sync error:', error);
+        logError('Sync from backup folder error', error);
         vscode.window.showErrorMessage('Failed to sync from backup folder: ' + error);
     }
 }

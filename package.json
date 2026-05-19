@@ -107,13 +107,18 @@
                     "group": "inline@2"
                 },
                 {
+                    "command": "snippets.insertSnippet",
+                    "when": "view == snippetsExplorer && (viewItem == snippet || viewItem == pinnedSnippet)",
+                    "group": "inline@1"
+                },
+                {
                     "command": "snippets.deleteItem",
                     "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
                     "group": "inline@6"
                 },
                 {
                     "command": "snippets.deleteItem",
-                    "when": "view == snippetsExplorer && viewItem == snippet",
+                    "when": "view == snippetsExplorer && (viewItem == snippet || viewItem == pinnedSnippet)",
                     "group": "inline"
                 },
                 {
@@ -133,23 +138,43 @@
                 },
                 {
                     "command": "snippets.renameSnippet",
-                    "when": "view == snippetsExplorer && viewItem == snippet",
+                    "when": "view == snippetsExplorer && (viewItem == snippet || viewItem == pinnedSnippet)",
                     "group": "1_modification"
+                },
+                {
+                    "command": "snippets.insertSnippet",
+                    "when": "view == snippetsExplorer && (viewItem == snippet || viewItem == pinnedSnippet)",
+                    "group": "2_snippet@1"
+                },
+                {
+                    "command": "snippets.copyToClipboard",
+                    "when": "view == snippetsExplorer && (viewItem == snippet || viewItem == pinnedSnippet)",
+                    "group": "2_snippet@2"
+                },
+                {
+                    "command": "snippets.duplicateSnippet",
+                    "when": "view == snippetsExplorer && (viewItem == snippet || viewItem == pinnedSnippet)",
+                    "group": "2_snippet@3"
+                },
+                {
+                    "command": "snippets.togglePin",
+                    "when": "view == snippetsExplorer && (viewItem == snippet || viewItem == pinnedSnippet)",
+                    "group": "2_snippet@4"
                 },
                 {
                     "command": "snippets.moveToRoot",
                     "when": "view == snippetsExplorer && viewItem == subfolder",
-                    "group": "2_modification@1"
+                    "group": "3_modification@1"
                 },
                 {
                     "command": "snippets.moveUp",
                     "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
-                    "group": "2_modification@2"
+                    "group": "3_modification@2"
                 },
                 {
                     "command": "snippets.moveDown",
                     "when": "view == snippetsExplorer && (viewItem == folder || viewItem == subfolder)",
-                    "group": "2_modification@3"
+                    "group": "3_modification@3"
                 }
             ]
         },
@@ -233,6 +258,31 @@
                 "command": "snippets.moveDown",
                 "title": "Move Down",
                 "icon": "$(arrow-down)"
+            },
+            {
+                "command": "snippets.insertSnippet",
+                "title": "Insert into Editor",
+                "icon": "$(arrow-right)"
+            },
+            {
+                "command": "snippets.copyToClipboard",
+                "title": "Copy to Clipboard",
+                "icon": "$(clippy)"
+            },
+            {
+                "command": "snippets.duplicateSnippet",
+                "title": "Duplicate Snippet",
+                "icon": "$(copy)"
+            },
+            {
+                "command": "snippets.togglePin",
+                "title": "Toggle Pin ★",
+                "icon": "$(star)"
+            },
+            {
+                "command": "snippets.showLog",
+                "title": "Show VS Snippets Log",
+                "category": "VS Snippets"
             }
         ],
         "configuration": {

@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { Folder, Snippet } from './types';
+import { log, logError } from '../logger';
 
 interface SnippetUpdate {
     id: string;
@@ -21,7 +22,7 @@ export class LocalStorage {
     constructor() {
         this.storagePath = path.join(os.homedir(), '.vscode', 'snippets');
         this.initializeStorage().catch(error => {
-            console.error('Failed to initialize storage:', error);
+            logError('Failed to initialize storage', error);
         });
     }
 
@@ -51,7 +52,7 @@ export class LocalStorage {
 
             this.initialized = true;
         } catch (error) {
-            console.error('Error initializing storage:', error);
+            logError('Error initializing storage', error);
             throw error;
         }
     }
@@ -102,14 +103,15 @@ export class LocalStorage {
                 language: snippet.language || 'plaintext',
                 notes: snippet.notes || '',
                 tags: Array.isArray(snippet.tags) ? snippet.tags : [],
-                lastModified: snippet.lastModified || Date.now()
+                lastModified: snippet.lastModified || Date.now(),
+                pinned: snippet.pinned ?? false
             }));
 
 
 
             return sanitizedSnippets;
         } catch (error) {
-            console.error('[DEBUG] Error reading snippets:', error);
+            logError('Error reading snippets', error);
             throw error;
         }
     }
@@ -127,7 +129,7 @@ export class LocalStorage {
             const savedFolders = JSON.parse(savedContent);
 
         } catch (error) {
-            console.error('[DEBUG] Error verifying folders file:', error);
+            logError('Error verifying folders file', error);
         }
     }
 
@@ -144,7 +146,8 @@ export class LocalStorage {
             language: snippet.language || 'plaintext',
             notes: snippet.notes || '',
             tags: Array.isArray(snippet.tags) ? snippet.tags : [],
-            lastModified: snippet.lastModified || Date.now()
+            lastModified: snippet.lastModified || Date.now(),
+            pinned: snippet.pinned ?? false
         }));
 
         const snippetsPath = path.join(this.storagePath, 'snippets.json');
@@ -161,7 +164,7 @@ export class LocalStorage {
             const savedSnippets = JSON.parse(savedContent);
 
         } catch (error) {
-            console.error('[DEBUG] Error verifying snippets file:', error);
+            logError('Error verifying snippets file', error);
             throw error;
         }
     }
@@ -204,7 +207,7 @@ export class LocalStorage {
                 timestamp: backupData.timestamp
             };
         } catch (error) {
-            console.error('[DEBUG] Error reading backup:', error);
+            logError('Error reading backup', error);
             throw error;
         }
     }
@@ -383,7 +386,7 @@ export class LocalStorage {
 
 
         } else {
-            console.error('Snippet not found:', update.id);
+            logError('Snippet not found', update.id);
             throw new Error('Snippet not found');
         }
     }
@@ -405,7 +408,6 @@ export class LocalStorage {
     private async updateBackupFile(data: { folders: Folder[]; snippets: Snippet[] }): Promise<void> {
         const backupFolder = vscode.workspace.getConfiguration('snippets').get<string>('backupFolder');
         if (!backupFolder) {
-            console.log('No backup folder configured, skipping backup update');
             return;
         }
 
@@ -435,7 +437,8 @@ export class LocalStorage {
                         language: snippet.language || 'plaintext',
                         notes: snippet.notes || '',
                         tags: snippet.tags || [],
-                        lastModified: snippet.lastModified || Date.now()
+                        lastModified: snippet.lastModified || Date.now(),
+                        pinned: snippet.pinned ?? false
                     }))
                 ]
             };
@@ -450,10 +453,10 @@ export class LocalStorage {
                 const verifyData = JSON.parse(verifyContent);
 
             } catch (verifyError) {
-                console.error('[DEBUG] Error verifying backup file:', verifyError);
+                logError('Error verifying backup file', verifyError);
             }
         } catch (error) {
-            console.error('[DEBUG] Failed to update backup file:', error);
+            logError('Failed to update backup file', error);
             // Show error to user since this is important for sync
             vscode.window.showErrorMessage(`Failed to update backup file: ${error}`);
         }
@@ -529,7 +532,7 @@ export class LocalStorage {
 
             return JSON.stringify(exportData, null, 2);
         } catch (error: any) {
-            console.error('Error exporting data:', error);
+            logError('Error exporting data', error);
             throw new Error(`Failed to export data: ${error.message}`);
         }
     }
@@ -545,7 +548,7 @@ export class LocalStorage {
 
             // Version compatibility check
             if (importedData.version !== "1.0") {
-                console.log(`Warning: Importing data from version ${importedData.version}`);
+                log(`Warning: Importing data from version ${importedData.version}`);
             }
 
             const { folders, snippets } = importedData.data;
@@ -648,7 +651,7 @@ export class LocalStorage {
 
 
         } catch (error: any) {
-            console.error('Error importing data:', error);
+            logError('Error importing data', error);
             throw new Error(`Failed to import data: ${error.message}`);
         }
     }
@@ -759,8 +762,42 @@ export class LocalStorage {
                 snippets: await this.getSnippetsData()
             });
         } catch (error) {
-            console.error('Error updating folder order:', error);
+            logError('Error updating folder order', error);
             throw new Error(`Failed to update folder order: ${error}`);
         }
+    }
+
+    async duplicateSnippet(id: string): Promise<Snippet> {
+        const snippets = await this.getSnippetsData();
+        const source = snippets.find(s => s.id === id);
+        if (!source) {
+            throw new Error('Snippet not found');
+        }
+        const copy: Snippet = {
+            ...source,
+            id: Date.now().toString(),
+            name: `${source.name} (copy)`,
+            lastModified: Date.now(),
+            pinned: false
+        };
+        snippets.push(copy);
+        await this.saveSnippetsData(snippets);
+        await this.updateBackupFile({ folders: await this.getFoldersData(), snippets });
+        return copy;
+    }
+
+    async togglePinSnippet(id: string): Promise<void> {
+        const snippets = await this.getSnippetsData();
+        const index = snippets.findIndex(s => s.id === id);
+        if (index === -1) {
+            throw new Error('Snippet not found');
+        }
+        snippets[index] = {
+            ...snippets[index],
+            pinned: !snippets[index].pinned,
+            lastModified: Date.now()
+        };
+        await this.saveSnippetsData(snippets);
+        await this.updateBackupFile({ folders: await this.getFoldersData(), snippets });
     }
 } 
