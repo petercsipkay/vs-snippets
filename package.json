@@ -241,7 +241,8 @@
                 "snippets.backupFolder": {
                     "type": "string",
                     "default": "",
-                    "description": "The folder path where your snippets will be backed up. For cross-computer sync, choose a cloud storage folder (Dropbox, Google Drive, etc.)"
+                    "scope": "machine",
+                    "description": "The folder path where your snippets will be backed up. For cross-computer sync, choose a cloud storage folder (Dropbox, Google Drive, etc.). This setting is machine-specific and is not shared via VS Code Settings Sync, so each computer keeps its own path."
                 }
             }
         }
